@@ -1,0 +1,129 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
+import { Repository } from 'typeorm';
+import { User } from '../entity/user.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import * as argon from 'argon2';
+import { CreateAccountDto } from '../../authentication/dto/auth.dto';
+import { BusinessService } from 'src/modules/businesses/service/business.service';
+import { WalletService } from 'src/modules/wallets/service/wallets.service';
+import { BusinessMembersService } from 'src/modules/business-members/service/business-members.service';
+import { CountryService } from 'src/modules/country-and-states/service/country.service';
+import { BusinessRolesService } from 'src/modules/business-members/service/business-roles.service';
+
+@Injectable()
+export class UserService {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    private readonly businessService: BusinessService,
+    private readonly businessMemberService: BusinessMembersService,
+    private readonly businessRolesService: BusinessRolesService,
+    private readonly countryService: CountryService,
+    private readonly walletService: WalletService,
+  ) {}
+
+  async setupNewAccount(dto: CreateAccountDto) {
+    return this.userRepo.manager.transaction(async (entityManager) => {
+      const email = dto.email.toLowerCase().trim();
+      const phoneNumber = dto.phoneNumber.trim();
+      const existingUser = await entityManager.findOne(User, {
+        where: { email },
+      });
+      const country = await this.countryService.getCountryById(dto.countryId);
+      if (!country) {
+        throw new BadRequestException('Country selected is not supported');
+      }
+      const numberUsed = await entityManager.findOne(User, {
+        where: { phoneNumber },
+      });
+      if (existingUser) {
+        throw new ConflictException('Email already exists');
+      }
+
+      if (numberUsed) {
+        throw new ConflictException('Phone number already exists');
+      }
+
+      const user = entityManager.create(User, {
+        firstName: dto.firstName.trim(),
+        lastName: dto.lastName.trim(),
+        email,
+        phoneNumber: dto.phoneNumber.trim(),
+        dialCode: dto.diaCode,
+        password: await argon.hash(dto.password),
+      });
+
+      const savedUser = await entityManager.save(user);
+      const savedBusiness = await this.businessService.setupNewBusiness(
+        {
+          businessAddress: dto.businessAddress,
+          businessPhone: dto.phoneNumber,
+          businessName: dto.businessName,
+          countryId: dto.countryId,
+          stateId: dto.stateId,
+          lgId: dto.lgId,
+        },
+        entityManager,
+      );
+
+      await this.walletService.setupNewBusinessWallet(
+        {
+          countryId: dto.countryId,
+          businessId: savedBusiness.businessId,
+          currency: country.currency,
+        },
+        entityManager,
+      );
+      const ownerRole =
+        await this.businessRolesService.createAdminRoleWithAllPermissions(
+          savedBusiness.businessId,
+          entityManager,
+        );
+      await this.businessMemberService.createOwnerMembership(
+        {
+          roleId: ownerRole.roleId,
+          userId: savedUser.userId,
+          businessId: savedBusiness.businessId,
+        },
+        entityManager,
+      );
+      const { password, ...account } = savedUser;
+
+      return account;
+    });
+  }
+
+  async dashBoardAuthentication(email: string) {
+    const user = await this.userRepo.findOne({
+      where: { email: email.toLowerCase().trim() },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Account not found');
+    }
+
+    const activeBusinessMemberships =
+      await this.businessMemberService.findActiveMembershipsByUser(user.userId);
+    const activeBusiness =
+      activeBusinessMemberships.length === 1
+        ? activeBusinessMemberships[0].business
+        : null;
+    const roleId =
+      activeBusinessMemberships.length === 1
+        ? activeBusinessMemberships[0].roleId
+        : null;
+    const allowedPermissions =
+      await this.businessRolesService.getUserPermissionInBusiness(roleId ?? '');
+    return {
+      user,
+      activeBusiness,
+      allowedPermissions,
+      activeBusinessMemberships,
+      environment: activeBusiness?.environment ?? 'TEST',
+    };
+  }
+}
