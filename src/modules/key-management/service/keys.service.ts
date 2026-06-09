@@ -38,7 +38,16 @@ export class KeysService {
     /**
      * Generating new key invalidate or delete previous keys
      */
-    await this.keyRepository.delete(scope);
+    const envKey = await this.keyRepository.findOne({
+      where: { businessId: scope.businessId, environment: scope.environment },
+    });
+    if (envKey) {
+      console.log(scope);
+      await this.keyRepository.delete({
+        businessId: scope.businessId,
+        environment: scope.environment,
+      });
+    }
 
     const privateHash = this.keyRepository.create({
       keyHash: secretKey,
