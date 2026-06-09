@@ -44,11 +44,11 @@ export class WalletService {
       /***
        * Early return for already successful transactions
        */
-      const isProcessed =
-        await this.txnService.getSuccessFulTransactions(reference);
-      if (isProcessed) {
-        return;
-      }
+      // const isProcessed =
+      //   await this.txnService.getSuccessFulTransactions(reference);
+      // if (isProcessed) {
+      //   return;
+      // }
       const { providerFee, chargedFee: merchantFee } =
         await this.feeConfigService.getFeeBySource(
           input.source,
