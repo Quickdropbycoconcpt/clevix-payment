@@ -38,6 +38,7 @@ export class VfdClient {
     input: CreateVirtualAccountInput,
   ): Promise<VfdCreateVirtualAccountResponse> {
     const response = await this.vfdVirtualAccountGeneration(input);
+    console.log(response);
     return {
       accountNumber: response.data?.accountNumber,
       accountName: input.accountName,
