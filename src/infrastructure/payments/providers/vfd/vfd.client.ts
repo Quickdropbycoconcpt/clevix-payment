@@ -152,10 +152,11 @@ export class VfdClient {
               validityTime: `${body.validityTime ?? '2400'}`,
               amountValidation: body.amountValidation ?? 'A0',
             },
-            { headers: { AccessToken: token } },
+            axiosConfig(body.environment, token),
           ),
         ),
       );
+
       return response;
     } catch (error) {
       console.log(error);
