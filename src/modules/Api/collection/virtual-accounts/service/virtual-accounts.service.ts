@@ -77,7 +77,8 @@ export class VirtualAccountsService {
       customerEmail: dto.customerEmail?.trim().toLowerCase(),
       validityTime,
     });
-    if (!result) {
+    console.log(result);
+    if (!result?.accountNumber) {
       throw new InternalServerErrorException(
         'Something went wrong. Please try again later',
       );
