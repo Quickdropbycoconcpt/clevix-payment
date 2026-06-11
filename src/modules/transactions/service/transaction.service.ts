@@ -325,6 +325,13 @@ export class TransactionService {
       .getMany();
   }
 
+  async moveOutgoingTransactionToProcessing(reference: string) {
+    return await this.transactionRepo.update(
+      { reference },
+      { executionStatus: TransactionStatus.PROCESSING },
+    );
+  }
+
   private isUniqueViolation(error: unknown): boolean {
     const databaseError = error as {
       code?: string;
