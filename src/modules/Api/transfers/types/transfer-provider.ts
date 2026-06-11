@@ -15,5 +15,6 @@ export type TransactionStatusQuery = {
 export type TransactionQueryStatus = {
   success: boolean;
   sessionId: string;
+  status?: string;
   reference: string;
 };
