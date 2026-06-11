@@ -12,7 +12,7 @@ import {
   TransactionStatus,
 } from 'src/shared/enum';
 import { IntegerAmount, toIntegerAmountString } from 'src/shared/utils';
-import { EntityManager, Repository } from 'typeorm';
+import { Brackets, EntityManager, Repository } from 'typeorm';
 import { Transactions } from '../entity/transaction.entity';
 
 type TransactionAmount = IntegerAmount;
@@ -199,12 +199,16 @@ export class TransactionService {
     });
   }
 
-  async getSuccessFulTransactions(reference: string) {
-    return await this.transactionRepo
+  async getSuccessfulTransaction(reference: string) {
+    return this.transactionRepo
       .createQueryBuilder('txn')
-      .where('txn.reference = :reference', { reference })
-      .orWhere('txn.merchantReference = :reference', { reference })
-      .orWhere('txn.providerReference = :reference', { reference })
+      .where(
+        new Brackets((qb) => {
+          qb.where('txn.reference = :reference', { reference })
+            .orWhere('txn.merchantReference = :reference', { reference })
+            .orWhere('txn.providerReference = :reference', { reference });
+        }),
+      )
       .andWhere('txn.executionStatus = :status', {
         status: TransactionStatus.SUCCESS,
       })
@@ -301,6 +305,26 @@ export class TransactionService {
     }
 
     return payload;
+  }
+
+  async getInitiatedOrProcessingTransferTxn(input: { batchSize: number }) {
+    return this.transactionRepo
+      .createQueryBuilder('txn')
+      .where(
+        new Brackets((qb) => {
+          qb.where('txn.executionStatus = :initiated', {
+            initiated: TransactionStatus.INITIATED,
+          }).orWhere('txn.executionStatus = :processing', {
+            processing: TransactionStatus.PROCESSING,
+          });
+        }),
+      )
+      .andWhere('txn.source = :source', {
+        source: TransactionSource.TRANSFER,
+      })
+      .orderBy('txn.createdAt', 'ASC')
+      .take(input.batchSize)
+      .getMany();
   }
 
   private isUniqueViolation(error: unknown): boolean {

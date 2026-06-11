@@ -12,6 +12,13 @@ import { RedisConfig } from 'src/infrastructure/redis/redis.config';
 import { RequestEnvironment } from 'src/shared/enum';
 import { MoneyValueConverter } from 'src/shared/converter';
 import { axiosConfig } from 'src/shared/utils';
+import * as crypto from 'node:crypto';
+import { TransferQueJobData } from 'src/modules/Api/transfers/job/transfer-queue-job';
+import {
+  AccountValidation,
+  TransactionQueryStatus,
+  TransactionStatusQuery,
+} from 'src/modules/Api/transfers/types/transfer-provider';
 
 type VfdCreateVirtualAccountResponse = {
   accountNumber: string;
@@ -76,7 +83,7 @@ export class VfdClient {
       const response = await this.withTokenRetry(body.environment, (token) =>
         firstValueFrom(
           this.httpService.post(
-            `${credentials.url}/credit`,
+            `${credentials.walletUrl}/credit`,
 
             {
               amount: totalAmount.toString(),
@@ -107,7 +114,7 @@ export class VfdClient {
   }
 
   private credentialPicker(environment: string): {
-    url: string;
+    walletUrl: string;
     authUrl: string;
     consumerKey: string;
     consumerSecret: string;
@@ -132,7 +139,7 @@ export class VfdClient {
         ? process.env.VFD_DEV_CONSUMER_SECRET
         : process.env.VFD_LIVE_CONSUMER_SECRET;
 
-    return { url, consumerKey, consumerSecret, authUrl };
+    return { walletUrl: url, consumerKey, consumerSecret, authUrl };
   }
 
   private async vfdVirtualAccountGeneration(body: CreateVirtualAccountInput) {
@@ -143,7 +150,7 @@ export class VfdClient {
       const response = await this.withTokenRetry(body.environment, (token) =>
         firstValueFrom(
           this.httpService.post(
-            `${credentials.url}/virtualaccount`,
+            `${credentials.walletUrl}/virtualaccount`,
             {
               amount: totalAmount.toString(),
               merchantName: body.accountName ?? 'CLEVIX CHECKOUT',
@@ -181,9 +188,9 @@ export class VfdClient {
       const response = await this.withTokenRetry(body.environment, (token) =>
         firstValueFrom(
           this.httpService.post(
-            `${credentials.url}/client/tiers/individual?${queryParams.toString()}`,
+            `${credentials.walletUrl}/client/tiers/individual?${queryParams.toString()}`,
             {},
-            { headers: { AccessToken: token } },
+            axiosConfig(body.environment, token),
           ),
         ),
       );
@@ -221,7 +228,7 @@ export class VfdClient {
       const response = await this.withTokenRetry(body.environment, (token) =>
         firstValueFrom(
           this.httpService.post(
-            `${credentials.url}/client/tiers/corporate`,
+            `${credentials.walletUrl}/client/tiers/corporate`,
             {
               rcNumber,
               companyName,
@@ -310,6 +317,152 @@ export class VfdClient {
     } catch (error: any) {
       console.log(error.message);
       throw new BadRequestException(error.message);
+    }
+  }
+
+  async vfdTransfer(body: TransferQueJobData) {
+    const response = await this.vfdsenderaccountEnquiry(
+      body.environment,
+      body.senderAccount,
+    );
+    const query: AccountValidation = {
+      accountNumber: body.accountNumber,
+      bankCode: body.bankCode,
+    };
+    const recieverDetails = await this.vfdAccountValidation(
+      body.environment,
+      query,
+    );
+    const { accountNo, client, clientId, accountId } = response;
+    const accountConcat = `${accountNo}${body.accountNumber}`;
+    const signature = crypto
+      .createHash('sha512')
+      .update(accountConcat)
+      .digest('hex');
+    const payload = {
+      fromAccount: accountNo,
+      fromClientId: clientId,
+      fromClient: client,
+      fromSavingsId: accountId,
+      fromBvn: '',
+      toClientId: recieverDetails.data.clientId,
+      toClient: body.accountName,
+      toSavingsId: recieverDetails.data.account.id,
+      toSession: recieverDetails.data.account.id,
+      toBvn: recieverDetails.data.bvn,
+      toAccount: body.accountNumber,
+      toBank: body.bankCode,
+      signature,
+      amount: MoneyValueConverter.fromKoboToNaira(body.amount),
+      remark: body.narration,
+      transferType: body.bankCode == '999999' ? 'intra' : 'inter',
+      reference: body.reference,
+    };
+    try {
+      const credentials = this.credentialPicker(body.environment);
+      const response = await this.withTokenRetry(body.environment, (token) =>
+        firstValueFrom(
+          this.httpService.post(
+            `${credentials.walletUrl}/transfer`,
+            payload,
+            axiosConfig(body.environment, token),
+          ),
+        ),
+      );
+      return response.data;
+    } catch (error: any) {
+      console.log(error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
+  async vfdsenderaccountEnquiry(
+    environment: string,
+    senderAccountNo: string,
+  ): Promise<{
+    clientId: string;
+    accountId: string;
+    client: string;
+    accountNo: string;
+  }> {
+    try {
+      const credentials = this.credentialPicker(environment);
+      const queryParams = new URLSearchParams();
+      if (senderAccountNo) queryParams.append('accountNumber', senderAccountNo);
+      const response = await this.withTokenRetry(environment, (token) =>
+        firstValueFrom(
+          this.httpService.get(
+            `${credentials.walletUrl}/account/enquiry?${queryParams.toString()}`,
+            axiosConfig(environment, token),
+          ),
+        ),
+      );
+      const { accountNo, client, clientId, accountId } = response.data.data;
+      return { clientId, client, accountNo, accountId };
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  async vfdAccountValidation(environment: string, query: AccountValidation) {
+    try {
+      const credentials = this.credentialPicker(environment);
+      const response = await this.withTokenRetry(environment, (token) =>
+        firstValueFrom(
+          this.httpService.get(
+            `${credentials.walletUrl}/transfer/recipient?accountNo=${
+              query.accountNumber
+            }&bank=${query.bankCode}&transfer_type=${
+              query.bankCode == '999999' ? 'intra' : 'inter'
+            }`,
+
+            axiosConfig(environment, token),
+          ),
+        ),
+      );
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        if (error.response.status == 404) {
+          throw new BadRequestException('Receipient details not found');
+        }
+      }
+      throw new BadRequestException(error.message, error);
+    }
+  }
+
+  async transactionStatusQuery(
+    input: TransactionStatusQuery,
+  ): Promise<TransactionQueryStatus> {
+    try {
+      const { reference, environment } = input;
+      const credentials = this.credentialPicker(environment);
+      const response = await this.withTokenRetry(environment, (token) =>
+        firstValueFrom(
+          this.httpService.get(
+            `${credentials.walletUrl}/transactions?reference=${reference}`,
+
+            axiosConfig(environment, token),
+          ),
+        ),
+      );
+
+      if (!response?.data?.data?.transactionStatus) {
+        return {
+          success: false,
+          sessionId: response?.data?.data?.sessionId,
+          reference,
+        };
+      }
+      return response.data.data.transactionStatus == '00'
+        ? { success: true, sessionId: response.data.data.sessionId, reference }
+        : {
+            success: false,
+            sessionId: response?.data?.data?.sessionId,
+            reference,
+          };
+    } catch (error) {
+      return { success: false, sessionId: null, reference: input.reference };
     }
   }
 }

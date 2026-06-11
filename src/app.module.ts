@@ -11,6 +11,8 @@ import { PosModule } from './modules/Api/collection/pos/pos.module';
 import { VirtualAccountsModule } from './modules/Api/collection/virtual-accounts/virtual-accounts.module';
 import { HttpModule } from '@nestjs/axios';
 import { BullModule } from '@nestjs/bullmq';
+import { TransferModule } from './modules/Api/transfers/transfer.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -18,6 +20,7 @@ import { BullModule } from '@nestjs/bullmq';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+    ScheduleModule.forRoot({}),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -37,6 +40,7 @@ import { BullModule } from '@nestjs/bullmq';
     CountryModule,
     PosModule,
     VirtualAccountsModule,
+    TransferModule,
   ],
   controllers: [AppController],
   providers: [AppService],

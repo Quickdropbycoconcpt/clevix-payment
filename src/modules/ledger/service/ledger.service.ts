@@ -77,6 +77,7 @@ export class LedgerService {
     }
 
     if (totalDebit !== expectedAmount) {
+      console.log(expectedAmount);
       throw new BadRequestException('Ledger posting amount does not match');
     }
 

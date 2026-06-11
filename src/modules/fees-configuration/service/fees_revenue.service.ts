@@ -115,11 +115,11 @@ export class FeeConfigurationService {
     }
 
     const numeratorProduct = amountInKobo * feeRate.numerator;
-    /***Fees are always rounding up */
+    /***Fees are always rounding up to  esnure amount are charged
+     *
+     */
     const fee =
       (numeratorProduct + feeRate.denominator - 1n) / feeRate.denominator;
-
-    // const fee = (amountInKobo * feeRate.numerator) / feeRate.denominator;
     const cap = fromNairaToKoboAmount(
       config.percentageFeeCap,
       'percentageFeeCap',

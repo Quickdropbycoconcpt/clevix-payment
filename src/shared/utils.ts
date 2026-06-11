@@ -11,7 +11,7 @@ export type DecimalRatio = {
   numerator: bigint;
   denominator: bigint;
 };
-const proxyUrl = process.env.QUOTAGUARDSTATIC_URL;
+const proxyUrl = process.env.QUOTAGUARDSTATIC_URL ?? 'https://example.com';
 
 const httpsAgent = new HttpsProxyAgent(proxyUrl);
 export const toIntegerAmountString = (

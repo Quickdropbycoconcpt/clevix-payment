@@ -1,30 +1,22 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { VfdPosProvider } from 'src/infrastructure/payments/providers/vfd/vfd-adapter/vfd-pos-adapter';
-
-import { NairaTransferAdapter } from './contracts/transfer.adapter';
+import { TransferAdapter } from './contracts/transfer.adapter';
 import { TransferProvider } from '../types/transfer-provider';
-import { VfdTransferAdapter } from 'src/infrastructure/payments/providers/vfd/vfd-adapter/vfd-transfer-adapter';
+import { VfdTransferProvider } from 'src/infrastructure/payments/providers/vfd/vfd-adapter/vfd-transfer-adapter';
 
 @Injectable()
 export class TransferAdapterFactory {
-  private readonly virtualAccountAdapters = new Map<
+  private readonly transferAdapters = new Map<
     TransferProvider,
-    NairaTransferAdapter
+    TransferAdapter
   >();
 
-  constructor(
-    private readonly vfdVirtualAccountProvider: VfdTransferAdapter,
-    private readonly vfdPosProvider: VfdPosProvider,
-  ) {
-    this.virtualAccountAdapters.set(
-      TransferProvider.VFD,
-      this.vfdVirtualAccountProvider,
-    );
+  constructor(private readonly vfdTransferAdapter: VfdTransferProvider) {
+    this.transferAdapters.set(TransferProvider.VFD, this.vfdTransferAdapter);
   }
 
-  getNairaTransferdapter(provider: string): VfdTransferAdapter {
+  getTransferdapter(provider: string): TransferAdapter {
     const normalizedProvider = this.normalizeProvider(provider);
-    const adapter = this.virtualAccountAdapters.get(normalizedProvider);
+    const adapter = this.transferAdapters.get(normalizedProvider);
 
     if (!adapter) {
       throw new BadRequestException(

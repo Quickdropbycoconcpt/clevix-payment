@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import {
   CreateWalletInterface,
   CreditWallet,
+  DebitWallet,
 } from '../interface/wallet.interface';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Wallets } from '../entity/wallet.entity';
@@ -45,7 +46,7 @@ export class WalletService {
        * Early return for already successful transactions
        */
       // const isProcessed =
-      //   await this.txnService.getSuccessFulTransactions(reference);
+      //   await this.txnService.getSuccessfulTransaction(reference);
       // if (isProcessed) {
       //   return;
       // }
@@ -101,7 +102,7 @@ export class WalletService {
             entityManager,
           );
 
-        const providerFeeLedger =
+        const providerFeeExpenseLedger =
           await this.ledgerService.findOrCreateLedgerAccount(
             {
               ownerId: `${provider}-fee`,
@@ -129,7 +130,7 @@ export class WalletService {
                 memo: 'Provider settlement receivable',
               },
               {
-                ledgerAccountId: providerFeeLedger.ledgerAccountId,
+                ledgerAccountId: providerFeeExpenseLedger.ledgerAccountId,
                 direction: LedgerEntryDirection.DEBIT,
                 amount: providerFee.toString(),
                 memo: 'Provider collection fee',
@@ -252,12 +253,154 @@ export class WalletService {
     }
   }
 
-  async debitUserWallet() {
+  async debitUserWallet(input: DebitWallet) {
     /**
-     * Create the ledger accounts and transactions
-     * create transactions
-     * debit user wallets
+     * Walidate wallet balance
      */
+    const { businessId, amount, currency, provider, environment, reference } =
+      input;
+
+    const grossPayoutAmount = BigInt(amount);
+
+    if (grossPayoutAmount < 0n) {
+      throw new BadRequestException('Amount can not be negative');
+    }
+
+    const { providerFee, chargedFee: merchantFee } =
+      await this.feeConfigService.getFeeBySource(
+        input.source,
+        businessId,
+        provider,
+        amount,
+      );
+
+    const totalMerchantDebit = grossPayoutAmount + merchantFee;
+    const revenue = merchantFee - providerFee;
+
+    /**
+     * Avoid double spend by using database lock.
+     */
+    await this.walletRepo.manager.transaction(async (entityManager) => {
+      const result = await entityManager
+        .createQueryBuilder()
+        .update(Wallets)
+        .set({
+          balance: () => 'balance - :amount',
+        })
+        .where('businessId = :businessId', { businessId })
+        .andWhere('currency = :currency', { currency })
+        .andWhere('environment = :environment', { environment })
+        .andWhere('balance >= :amount', { amount: totalMerchantDebit })
+        .setParameter('amount', totalMerchantDebit)
+        .execute();
+
+      if (result.affected !== 1) {
+        /**
+         * Exit here if business doesn't have balance for requested operation
+         */
+        throw new BadRequestException('Your balance is currently low');
+      }
+
+      /**
+       * Begin ledger balance recording process
+       */
+      const businessLedgerAccount =
+        await this.ledgerService.findOrCreateLedgerAccount(
+          {
+            ownerId: businessId,
+            ownerType: LedgerAccountOwnerType.BUSINESS,
+            accountType: LedgerAccountType.CUSTOMER_CASH,
+            currency,
+            environment,
+          },
+          entityManager,
+        );
+
+      const providerLedger = await this.ledgerService.findOrCreateLedgerAccount(
+        {
+          ownerId: provider,
+          ownerType: LedgerAccountOwnerType.PROVIDER,
+          accountType: LedgerAccountType.PROVIDER_SETTLEMENT,
+          currency,
+          environment,
+        },
+        entityManager,
+      );
+
+      const revenueLedger = await this.ledgerService.findOrCreateLedgerAccount(
+        {
+          ownerId: 'clevix-revenue',
+          ownerType: LedgerAccountOwnerType.SYSTEM,
+          accountType: LedgerAccountType.FEES_REVENUE,
+          currency,
+          environment,
+        },
+        entityManager,
+      );
+      await this.ledgerService.ledgerPosting(
+        {
+          reference,
+          environment,
+          businessId: input.businessId,
+          transactionType: input.source,
+          amount: totalMerchantDebit.toString(),
+          currency: input.currency,
+          entries: [
+            {
+              ledgerAccountId: providerLedger.ledgerAccountId,
+              direction: LedgerEntryDirection.CREDIT,
+              amount: grossPayoutAmount.toString(), //1000 amount we payout from provider wallet
+              memo: 'Provider Settlement Payable',
+            },
+            {
+              ledgerAccountId: providerLedger.ledgerAccountId,
+              direction: LedgerEntryDirection.CREDIT, //10
+              amount: providerFee.toString(),
+              memo: 'Provider payout fee deduction',
+            },
+            {
+              ledgerAccountId: businessLedgerAccount.ledgerAccountId,
+              direction: LedgerEntryDirection.DEBIT,
+              amount: totalMerchantDebit.toString(), //1020
+              memo: 'Total payout from merchant  wallet',
+            },
+            {
+              ledgerAccountId: revenueLedger.ledgerAccountId,
+              direction: LedgerEntryDirection.CREDIT,
+              amount: revenue.toString(), //20
+              memo: 'Platform payout  fee revenue',
+            },
+          ],
+        },
+        entityManager,
+      );
+      const transaction = await this.txnService.createTransaction(
+        {
+          businessId,
+          environment,
+          expectedAmount: grossPayoutAmount.toString(),
+          settledAmount: grossPayoutAmount.toString(),
+          fee: merchantFee.toString(),
+          source: input.source,
+          reference: input.reference,
+          remark: input.narration ?? 'Naira payout',
+          sourceId: input.sourceId ?? null,
+          currency,
+          provider,
+          executionStatus: TransactionStatus.INITIATED,
+          merchantReference: input.merchantReference ?? input.reference,
+          providerReference: input.providerReference ?? input.reference,
+          settlementStatus: TransactionSettlementStatus.UNSETTLED,
+          riskStatus: TransactionRiskStatus.CLEAR,
+          direction: LedgerEntryDirection.DEBIT,
+          idempotencyKey: `wallet-debit:${businessId}:${input.reference}`,
+          metadata: {},
+        },
+        entityManager,
+      );
+      return;
+      return transaction;
+    });
   }
 
   async findOrCreateWallet(

@@ -18,6 +18,13 @@ export enum TransactionSource {
   STAMP_DUTY = 'STAMP_DUTY',
 }
 
+export enum CollectionSource {
+  POS = 'POS',
+  DEBIT_MANDATES = 'DEBIT_MANDATES',
+  VIRTUAL_ACCOUNT = 'VIRTUAL_ACCOUNT',
+  CARD = 'CARD',
+}
+
 export enum LedgerEntryDirection {
   DEBIT = 'DEBIT',
   CREDIT = 'CREDIT',
@@ -43,4 +50,8 @@ export enum TransactionRiskStatus {
   CLEAR = 'CLEAR',
   HELD = 'HELD',
   DISPUTED = 'DISPUTED',
+}
+
+export enum JobQueueList {
+  MONEY_TRANSFER_PROCESSOR = 'MONEY_TRANSFER_PROCESSOR',
 }
