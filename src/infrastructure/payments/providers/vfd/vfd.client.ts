@@ -446,7 +446,7 @@ export class VfdClient {
           ),
         ),
       );
-      console.log('txnStatus', response?.data?.data?.transactionStatus);
+      console.log('txnStatus', response);
       if (!response?.data?.data?.transactionStatus) {
         return {
           success: false,
