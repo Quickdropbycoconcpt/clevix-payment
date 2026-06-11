@@ -312,9 +312,7 @@ export class TransactionService {
       .createQueryBuilder('txn')
       .where(
         new Brackets((qb) => {
-          qb.where('txn.executionStatus = :initiated', {
-            initiated: TransactionStatus.INITIATED,
-          }).orWhere('txn.executionStatus = :processing', {
+          qb.where('txn.executionStatus = :processing', {
             processing: TransactionStatus.PROCESSING,
           });
         }),

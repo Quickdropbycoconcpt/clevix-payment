@@ -60,7 +60,7 @@ export class TransferService {
     });
   }
 
-  @Cron(CronExpression.EVERY_SECOND)
+  @Cron(CronExpression.EVERY_10_SECONDS)
   async transactionStatusQuery() {
     const BATCH_SIZE = 200;
     const txns = await this.txnService.getInitiatedOrProcessingTransferTxn({
