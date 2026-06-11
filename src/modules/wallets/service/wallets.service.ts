@@ -266,6 +266,14 @@ export class WalletService {
       throw new BadRequestException('Amount can not be negative');
     }
 
+    const duplicateTxn = await this.txnService.getTransactionByMerchantRef(
+      input.reference,
+    );
+
+    if (duplicateTxn) {
+      throw new BadRequestException('Transaction with reference exist');
+    }
+
     const { providerFee, chargedFee: merchantFee } =
       await this.feeConfigService.getFeeBySource(
         input.source,
