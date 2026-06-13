@@ -55,3 +55,11 @@ export enum TransactionRiskStatus {
 export enum JobQueueList {
   MONEY_TRANSFER_PROCESSOR = 'MONEY_TRANSFER_PROCESSOR',
 }
+
+export enum WebhookAuthType {
+  API_KEY = 'API_KEY',
+
+  NO_AUTH = 'NO_AUTH',
+
+  BEARER_TOKEN = 'BEARER_TOKEN',
+}

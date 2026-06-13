@@ -17,4 +17,8 @@ export enum BusinessMemberStatus {
 export enum PermissionsEnum {
   KEY_VIEW = 'KEY_VIEW',
   KEY_CREATE = 'KEY_CREATE',
+  WEBHOOK_VIEW = 'WEBHOOK_VIEW',
+  WEBHOOK_CREATE = 'WEBHOOK_CREATE',
+  WEBHOOK_UPDATE = 'WEBHOOK_UPDATE',
+  WEBHOOK_DELETE = 'WEBHOOK_DELETE',
 }

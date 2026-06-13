@@ -10,7 +10,23 @@ export const permissionsSeed = [
   },
   {
     key: PermissionsEnum.KEY_CREATE,
-    description: 'Permission to view api keys',
+    description: 'Permission to create api keys',
+  },
+  {
+    key: PermissionsEnum.WEBHOOK_VIEW,
+    description: 'Permission to view webhooks',
+  },
+  {
+    key: PermissionsEnum.WEBHOOK_CREATE,
+    description: 'Permission to create webhooks',
+  },
+  {
+    key: PermissionsEnum.WEBHOOK_UPDATE,
+    description: 'Permission to update webhooks',
+  },
+  {
+    key: PermissionsEnum.WEBHOOK_DELETE,
+    description: 'Permission to delete webhooks',
   },
 ];
 

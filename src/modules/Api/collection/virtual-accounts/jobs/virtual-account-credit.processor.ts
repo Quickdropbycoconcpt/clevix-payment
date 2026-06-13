@@ -8,11 +8,15 @@ import {
 import { WalletService } from 'src/modules/wallets/service/wallets.service';
 import { TransactionSource } from 'src/shared/enum';
 import { MoneyValueConverter } from 'src/shared/converter';
+import { WebhookService } from 'src/modules/webhooks/service/webhook.service';
 
 @Injectable()
 @Processor(VIRTUAL_ACCOUNT_CREDIT_QUEUE)
 export class VirtualAccountCreditProcessor extends WorkerHost {
-  constructor(private readonly walletService: WalletService) {
+  constructor(
+    private readonly webhookService: WebhookService,
+    private readonly walletService: WalletService,
+  ) {
     super();
   }
   private readonly logger = new Logger(VirtualAccountCreditProcessor.name);
@@ -49,6 +53,25 @@ export class VirtualAccountCreditProcessor extends WorkerHost {
           receivedAccountNumber: credit.receivedAccountNumber,
           narration: credit.narration,
           sessionId: credit.sessionId,
+        },
+      });
+      /**
+       * Dispatch virtual collection webhook to merchant
+       */
+      await this.webhookService.dispatchWebhook({
+        businessId: businessId,
+        type: TransactionSource.VIRTUAL_ACCOUNT_COLLECTION,
+        environment,
+        payload: {
+          senderAccountNumber: credit.senderAccountNumber,
+          senderName: credit.senderName,
+          reference: merchantReference,
+          receivedAccountNumber: credit.receivedAccountNumber,
+          narration: credit.narration,
+          sessionId: credit.sessionId,
+          amount: MoneyValueConverter.fromNairaToKobo(
+            credit.amount.toString(),
+          ).toString(),
         },
       });
       return {

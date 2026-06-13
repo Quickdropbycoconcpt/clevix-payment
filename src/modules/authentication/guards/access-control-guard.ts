@@ -9,10 +9,8 @@ import { Reflector } from '@nestjs/core';
 import { PermissionsEnum } from 'src/modules/business-members/enums/business-member.enums';
 import { JwtPayload } from '../interface/jwt-payload.interface';
 export const PERMISSIONS_KEY = 'user-permissions';
-export const PermissionGranted = (...roles: PermissionsEnum[]) => {
-  console.log('PermissionGranted roles:', roles);
-  return SetMetadata(PERMISSIONS_KEY, roles);
-};
+export const PermissionGranted = (...roles: PermissionsEnum[]) =>
+  SetMetadata(PERMISSIONS_KEY, roles);
 @Injectable()
 export class AccessControlGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}

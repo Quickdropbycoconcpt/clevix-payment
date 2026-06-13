@@ -7,6 +7,7 @@ import { LedgerModule } from '../ledger/ledger.module';
 import { TransactionModule } from '../transactions/transactions.module';
 import { FeesModule } from '../fees-configuration/fees.module';
 import { TransactionFeesModule } from '../transaction_fees/transaction-fees.module';
+import { WebhookModule } from '../webhooks/webhook.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { TransactionFeesModule } from '../transaction_fees/transaction-fees.modu
     FeesModule,
     TransactionModule,
     TransactionFeesModule,
+    WebhookModule,
   ],
   controllers: [WalletController],
   providers: [WalletService],

@@ -13,6 +13,7 @@ import { HttpModule } from '@nestjs/axios';
 import { BullModule } from '@nestjs/bullmq';
 import { TransferModule } from './modules/Api/transfers/transfer.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { WebhookModule } from './modules/webhooks/webhook.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     PosModule,
     VirtualAccountsModule,
     TransferModule,
+    WebhookModule,
   ],
   controllers: [AppController],
   providers: [AppService],

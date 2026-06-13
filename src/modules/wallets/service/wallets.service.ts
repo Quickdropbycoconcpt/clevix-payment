@@ -24,6 +24,7 @@ import {
 import { TransactionService } from 'src/modules/transactions/service/transaction.service';
 import { FeeConfigurationService } from 'src/modules/fees-configuration/service/fees_revenue.service';
 import { TransactionFeesService } from 'src/modules/transaction_fees/service/transaction_fees.service';
+import { WebhookService } from 'src/modules/webhooks/service/webhook.service';
 
 @Injectable()
 export class WalletService {
@@ -36,9 +37,12 @@ export class WalletService {
     private readonly ledgerService: LedgerService,
     private readonly txnFee: TransactionFeesService,
     private readonly feeConfigService: FeeConfigurationService,
+    private readonly webhookService: WebhookService,
   ) {}
 
   async creditUserWallet(input: CreditWallet) {
+    let webhookPayload: Record<string, unknown> | null = null;
+
     try {
       const { reference, environment, amount, businessId, currency, provider } =
         input;
@@ -250,6 +254,31 @@ export class WalletService {
         error instanceof Error ? error.stack : String(error),
       );
       throw error;
+    }
+  }
+
+  async dispatchCreditWebhook(
+    input: CreditWallet,
+    payload: Record<string, unknown>,
+  ) {
+    try {
+      const transactionId =
+        typeof payload.transactionId === 'string'
+          ? payload.transactionId
+          : null;
+
+      await this.webhookService.dispatchWebhook({
+        businessId: input.businessId,
+        environment: input.environment,
+        transactionId,
+        type: input.source,
+        payload,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to dispatch credit webhook for reference=${input.reference}, businessId=${input.businessId}, source=${input.source}`,
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 
