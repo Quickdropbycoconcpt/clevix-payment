@@ -14,6 +14,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { TransferModule } from './modules/Api/transfers/transfer.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { WebhookModule } from './modules/webhooks/webhook.module';
+import { TransactionModule } from './modules/transactions/transactions.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { WebhookModule } from './modules/webhooks/webhook.module';
     PosModule,
     VirtualAccountsModule,
     TransferModule,
+    TransactionModule,
     WebhookModule,
   ],
   controllers: [AppController],

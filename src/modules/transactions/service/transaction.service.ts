@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
@@ -62,6 +63,21 @@ export type UpdateTransactionInput = Partial<
     | 'metadata'
   >
 >;
+
+export type GetTransactionStatusInput = {
+  reference: string;
+  businessId?: string | null;
+  environment?: string | null;
+};
+
+export type TransactionStatusResponse = {
+  transactionId: string;
+  sessionId: string | null;
+  reference: string;
+  amount: string;
+  currency: string;
+  status: TransactionStatus;
+};
 
 @Injectable()
 export class TransactionService {
@@ -225,6 +241,43 @@ export class TransactionService {
     return await repository.findOne({ where: { reference } });
   }
 
+  async getTransactionStatus(
+    input: GetTransactionStatusInput,
+  ): Promise<TransactionStatusResponse> {
+    const reference = input.reference?.trim();
+    const businessId = input.businessId?.trim();
+    const environment = input.environment?.trim();
+
+    if (!reference) {
+      throw new BadRequestException('Transaction reference is required');
+    }
+
+    if (!businessId || !environment) {
+      throw new BadRequestException('Invalid transaction status request scope');
+    }
+
+    const transaction = await this.transactionRepo
+      .createQueryBuilder('txn')
+      .where('txn.businessId = :businessId', { businessId })
+      .andWhere('txn.environment = :environment', { environment })
+      .andWhere('txn.deleteAt IS NULL')
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('txn.reference = :reference', { reference })
+            .orWhere('txn.merchantReference = :reference', { reference })
+            .orWhere('txn.providerReference = :reference', { reference });
+        }),
+      )
+      .orderBy('txn.createdAt', 'DESC')
+      .getOne();
+
+    if (!transaction) {
+      throw new NotFoundException('Transaction not found');
+    }
+
+    return this.toTransactionStatusResponse(transaction);
+  }
+
   private getTransactionUpdatePayload(
     input: UpdateTransactionInput,
   ): Partial<Transactions> {
@@ -330,6 +383,31 @@ export class TransactionService {
       { reference },
       { executionStatus: TransactionStatus.PROCESSING },
     );
+  }
+
+  private toTransactionStatusResponse(
+    transaction: Transactions,
+  ): TransactionStatusResponse {
+    return {
+      transactionId: transaction.transactionId,
+      sessionId: this.getTransactionSessionId(transaction),
+      reference: transaction.reference,
+      amount: transaction.expectedAmount,
+      currency: transaction.currency,
+      status: transaction.executionStatus,
+    };
+  }
+
+  private getTransactionSessionId(transaction: Transactions): string | null {
+    const sessionId = transaction.metadata?.sessionId;
+
+    if (typeof sessionId !== 'string') {
+      return null;
+    }
+
+    const trimmedSessionId = sessionId.trim();
+
+    return trimmedSessionId || null;
   }
 
   private isUniqueViolation(error: unknown): boolean {

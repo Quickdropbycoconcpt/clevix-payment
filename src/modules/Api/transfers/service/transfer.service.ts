@@ -77,10 +77,18 @@ export class TransferService {
         environment: txn.environment,
         reference: txn.reference,
       });
+      const metadata = result.sessionId
+        ? {
+            ...txn.metadata,
+            sessionId: result.sessionId,
+          }
+        : txn.metadata;
+
       this.txnService.updateTransactionBySystemReference(result.reference, {
         executionStatus: result.success
           ? TransactionStatus.SUCCESS
           : TransactionStatus.FAILED,
+        metadata,
       });
     }
   }
