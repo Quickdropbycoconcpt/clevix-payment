@@ -40,6 +40,7 @@ export class JwtAuthGuard implements CanActivate {
       request.user = await this.jwtService.verifyAsync<JwtPayload>(token, {
         secret: this.configService.get('JWT_DASHBOARD_TOKEN_SECRET'),
       });
+      
       return true;
     } catch {
       throw new UnauthorizedException('Invalid or expired token');

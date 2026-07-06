@@ -3,6 +3,7 @@ import { MoneyValueConverter } from './converter';
 import { AxiosRequestConfig } from 'axios';
 import { RequestEnvironment } from './enum';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import { randomInt } from 'crypto';
 
 export type IntegerAmount = string | number | bigint;
 export type DecimalValue = string | number;
@@ -126,4 +127,19 @@ export function axiosConfig(
   }
 
   return axiosConfig;
+}
+
+export function randomNumber(length: number): string {
+  const NUMERIC_VALUES = '01234567890';
+  return Array.from({ length }, () => {
+    const index = randomInt(NUMERIC_VALUES.length);
+
+    return NUMERIC_VALUES[index];
+  }).join('');
+}
+
+export function generateRrn(): string {
+  const timestamp = Date.now().toString().slice(-8); // last 8 digits of unix ms
+  const random = randomNumber(4); // 4 random digits
+  return `${timestamp}${random}`; // 12 digits total
 }

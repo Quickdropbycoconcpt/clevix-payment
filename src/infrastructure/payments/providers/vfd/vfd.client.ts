@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
-import { ChargePosInput } from 'src/modules/Api/collection/adapters/contracts/pos.adapter';
+import {
+  ChargePosInput,
+  ChargePosResult,
+} from 'src/modules/Api/collection/adapters/contracts/pos.adapter';
 import {
   CreateCorporateStaticAccount,
   CreateIndividualStaticAccount,
@@ -19,6 +22,12 @@ import {
   TransactionQueryStatus,
   TransactionStatusQuery,
 } from 'src/modules/Api/transfers/types/transfer-provider';
+import {
+  base64Encoded,
+  tripleDESEncrypt,
+  tripleDESDecrypt,
+  buildPosDataCode,
+} from 'src/shared/encryption';
 
 type VfdCreateVirtualAccountResponse = {
   accountNumber: string;
@@ -29,8 +38,7 @@ type VfdCreateVirtualAccountResponse = {
 
 type VfdChargePosResponse = {
   reference: string;
-  terminal_id: string;
-  amount: number;
+  amount: string;
   currency: string;
   status: string;
 };
@@ -103,13 +111,88 @@ export class VfdClient {
     }
   }
 
-  async chargePos(input: ChargePosInput): Promise<VfdChargePosResponse> {
+  async chargePos(input: ChargePosInput): Promise<ChargePosResult> {
+    const {
+      pan,
+      pin,
+      currency,
+      accountType,
+      amount,
+      cardExpiryDate,
+      source,
+      sequenceNumber,
+      serialNumber,
+      rrn,
+      stan,
+      iccData,
+      track2Data,
+    } = input;
+    const credentials = this.credentialPicker(input.environment);
+    const username = 'restdevice';
+    const password = '5NDM1NjckJV4KK';
+    const encodedbase64 = base64Encoded(`${username}:${password}`);
+    const response = await firstValueFrom(
+      this.httpService.post(
+        `${credentials.lux_url}/resd/network-mgt`,
+
+        {
+          serialNumber,
+          stan: input.stan,
+          onlyAccountInfo: false,
+        },
+        {
+          headers: {
+            Authorization: `Basic ${encodedbase64}`,
+          },
+        },
+      ),
+    );
+    const { sessionId, terminalId, businessName, businessAddress } =
+      response.data.data;
+    const payload = {
+      pan,
+      stan,
+      rrn,
+      amount,
+      iccData,
+      track2Data,
+      postDataCode: buildPosDataCode(source),
+      cardExpiryDate,
+      acquiringInstitutionalCode: '53998359',
+      sequenceNumber,
+      pin,
+      accountType,
+      type: 'CARD',
+      transactionCurrency: 'NAIRA',
+      businessName,
+      businessAddress,
+      latitude: null,
+      longitude: null,
+    };
+    console.log(payload);
+    const encrypted = tripleDESEncrypt(JSON.stringify(payload), sessionId);
+    const cardCharge = await firstValueFrom(
+      this.httpService.post(
+        `${credentials.lux_url}/resd/transaction`,
+        encrypted,
+        {
+          headers: {
+            Authorization: `Basic ${encodedbase64}`,
+            terminalId,
+            sessionId,
+            'Content-Type': 'text/plain',
+            Accept: 'application/json',
+          },
+        },
+      ),
+    );
+    const decryptedResponse = tripleDESDecrypt(cardCharge.data.data, sessionId);
+    const dv = JSON.parse(decryptedResponse);
     return {
-      reference: `vfd_pos_${input.reference}`,
-      terminal_id: input.terminalId,
-      amount: input.amount,
-      currency: input.currency,
-      status: 'pending',
+      code: dv?.responseCode,
+      status: dv?.description,
+      amount: dv?.amount,
+      currency,
     };
   }
 
@@ -117,12 +200,18 @@ export class VfdClient {
     walletUrl: string;
     authUrl: string;
     consumerKey: string;
+    lux_url: string;
     consumerSecret: string;
   } {
     const url =
       environment == RequestEnvironment.TEST
         ? process.env.VFD_DEV_WALLET_URL
         : process.env.VFD_LIVE_WALLET_URL;
+
+    const lux_url =
+      environment == RequestEnvironment.TEST
+        ? process.env.VFD_LUX_DEV_BASE_URL
+        : process.env.VFD_LUX_LIVE_BASE_URL;
 
     const authUrl =
       environment == RequestEnvironment.TEST
@@ -139,7 +228,7 @@ export class VfdClient {
         ? process.env.VFD_DEV_CONSUMER_SECRET
         : process.env.VFD_LIVE_CONSUMER_SECRET;
 
-    return { walletUrl: url, consumerKey, consumerSecret, authUrl };
+    return { walletUrl: url, consumerKey, consumerSecret, authUrl, lux_url };
   }
 
   private async vfdVirtualAccountGeneration(body: CreateVirtualAccountInput) {

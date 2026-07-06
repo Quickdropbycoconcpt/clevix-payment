@@ -123,7 +123,7 @@ export class UserService {
       activeBusiness,
       allowedPermissions,
       activeBusinessMemberships,
-      environment: activeBusiness?.environment ?? 'TEST',
+      environment: activeBusiness?.environment ?? 'TEST' ,
     };
   }
 }

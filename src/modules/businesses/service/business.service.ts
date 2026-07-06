@@ -45,6 +45,18 @@ export class BusinessService {
     return await this.businessRepo.findOne({ where: { businessId } });
   }
 
+  async findBusinessByIdentifier(businessIdentifier?: string | null) {
+    const identifier = businessIdentifier?.trim();
+
+    if (!identifier) {
+      return null;
+    }
+
+    return await this.businessRepo.findOne({
+      where: { businessIdentifier: identifier },
+    });
+  }
+
   private async generateBusinessIdentifier(
     entityManager?: EntityManager,
   ): Promise<string> {

@@ -1,8 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  CollectionProvider,
-  CollectionSource,
-} from 'src/modules/Api/collection/adapters/contracts/collection-adapter.types';
+import { CollectionProvider } from 'src/modules/Api/collection/adapters/contracts/collection-adapter.types';
 import {
   ChargePosInput,
   ChargePosResult,
@@ -18,16 +15,11 @@ export class VfdPosProvider implements PosAdapter {
 
   async chargePos(input: ChargePosInput): Promise<ChargePosResult> {
     const response = await this.vfdClient.chargePos(input);
-
     return {
-      provider: this.provider,
-      source: CollectionSource.POS,
-      reference: input.reference,
-      providerReference: response.reference,
-      terminalId: response.terminal_id,
-      amount: response.amount,
-      currency: response.currency,
-      status: response.status,
+      code: response?.code,
+      amount: response?.amount,
+      currency: response?.currency,
+      status: response?.status,
       raw: response,
     };
   }

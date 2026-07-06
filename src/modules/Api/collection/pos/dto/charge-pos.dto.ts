@@ -1,43 +1,68 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEmail,
   IsEnum,
-  IsInt,
   IsNotEmpty,
-  IsObject,
+  IsNumberString,
   IsOptional,
-  IsPositive,
   IsString,
 } from 'class-validator';
-import { CollectionProvider } from '../../adapters/contracts/collection-adapter.types';
+import type { TransactionType } from 'src/shared/encryption';
+import { PosChargePurpose } from 'src/shared/enum';
 
 export class ChargePosDto {
-  @ApiPropertyOptional({
-    enum: CollectionProvider,
-    default: CollectionProvider.VFD,
-  })
-  @IsOptional()
-  @IsEnum(CollectionProvider)
-  provider?: CollectionProvider;
-
-  @ApiProperty({ example: 'TERM-001' })
   @IsString()
   @IsNotEmpty()
-  terminalId: string;
+  pan: string;
 
-  @ApiProperty({ example: 500000 })
-  @IsInt()
-  @IsPositive()
-  amount: number;
+  @IsNumberString()
+  @IsNotEmpty()
+  amount: string;
 
-  @ApiPropertyOptional({ example: 'NGN', default: 'NGN' })
-  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  currency?: string;
+  iccData: string;
 
-  @ApiPropertyOptional({ example: 'pos-sale-10001' })
+  @IsString()
+  @IsNotEmpty()
+  track2Data: string;
+
+  @IsString()
+  @IsNotEmpty()
+  postDataCode: string;
+
+  @IsString()
+  @IsNotEmpty()
+  cardExpiryDate: string;
+
+  @IsString()
+  @IsNotEmpty()
+  serialNumber: string;
+
+  @IsString()
+  @IsNotEmpty()
+  source: TransactionType;
+
+  @IsString()
+  @IsNotEmpty()
+  sequenceNumber: string;
+
   @IsOptional()
+  @IsString()
+  pin: string;
+
+  @IsString()
+  @IsNotEmpty()
+  accountType: string;
+
+  @IsString()
+  @IsNotEmpty()
+  type: string;
+
+  @IsString()
+  @IsNotEmpty()
+  currency: string;
+
   @IsString()
   @IsNotEmpty()
   reference?: string;
@@ -48,11 +73,29 @@ export class ChargePosDto {
   customerEmail?: string;
 
   @ApiPropertyOptional({
-    example: {
-      outletId: 'outlet-001',
-    },
+    description:
+      'Identifier of the merchant to fund when charging on their behalf from a terminal not tied to their business',
+    example: 'AB12CD34EF56',
   })
   @IsOptional()
-  @IsObject()
-  metadata?: Record<string, unknown>;
+  @IsString()
+  businessIdentifier?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Why the customer is paying: topping up a wallet vs buying something from the merchant',
+    enum: PosChargePurpose,
+  })
+  @IsOptional()
+  @IsEnum(PosChargePurpose)
+  purpose?: PosChargePurpose;
+
+  @ApiPropertyOptional({
+    description:
+      "Opaque reference the merchant uses to reconcile the charge on their end - the paying customer's account id when purpose is WALLET_FUNDING, or the item/order id when purpose is PURCHASE. Clevix does not interpret this value.",
+    example: 'order_12345',
+  })
+  @IsOptional()
+  @IsString()
+  accountOrItemId?: string;
 }

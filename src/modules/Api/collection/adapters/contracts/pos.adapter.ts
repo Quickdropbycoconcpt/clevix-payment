@@ -1,27 +1,34 @@
-import {
-  CollectionProvider,
-  CollectionSource,
-} from './collection-adapter.types';
+import { TransactionType } from 'src/shared/encryption';
+import { CollectionProvider } from './collection-adapter.types';
 
 export type ChargePosInput = {
+  stan: string;
+  rrn: string;
+  iccData: string;
+  track2Data: string;
+  cardExpiryDate: string;
+  acquiringInstitutionalCode: string;
+  sequenceNumber: string;
+  source: TransactionType;
+  serialNumber: string;
+  pin: string;
+  pan: string;
+  accountType: string;
+  reference: string;
+  type: string;
   businessId: string;
   environment: string;
-  reference: string;
-  terminalId: string;
-  amount: number;
+  amount: string;
   currency: string;
+  latitude: number;
+  longitude: number;
   customerEmail?: string;
-  metadata?: Record<string, unknown>;
 };
 
 export type ChargePosResult = {
-  provider: CollectionProvider;
-  source: CollectionSource.POS;
-  reference: string;
-  providerReference: string;
-  terminalId: string;
-  amount: number;
+  amount: string;
   currency: string;
+  code: string;
   status: string;
   raw?: unknown;
 };
