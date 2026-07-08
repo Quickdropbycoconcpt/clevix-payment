@@ -29,10 +29,6 @@ export class ChargePosDto {
 
   @IsString()
   @IsNotEmpty()
-  postDataCode: string;
-
-  @IsString()
-  @IsNotEmpty()
   cardExpiryDate: string;
 
   @IsString()
@@ -65,7 +61,7 @@ export class ChargePosDto {
 
   @IsString()
   @IsNotEmpty()
-  reference?: string;
+  reference: string;
 
   @ApiPropertyOptional({ example: 'customer@clevix.com' })
   @IsOptional()
