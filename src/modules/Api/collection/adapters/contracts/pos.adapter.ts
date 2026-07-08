@@ -33,8 +33,28 @@ export type ChargePosResult = {
   raw?: unknown;
 };
 
+export type PosWebhookEvent = {
+  reference: string;
+  rrn: string;
+  stan: string;
+  amount: string;
+  settledAmount: string;
+  code: string;
+  status: string;
+  cardBin: string;
+  cardLastFour: string;
+  cardType: string;
+  cardBank: string;
+  terminalSerialNumber: string;
+  providerTerminalId: string;
+  transactionDate: string;
+  raw: unknown;
+};
+
 export interface PosAdapter {
   readonly provider: CollectionProvider;
 
   chargePos(input: ChargePosInput): Promise<ChargePosResult>;
+
+  parsePosWebhook(body: unknown): PosWebhookEvent;
 }

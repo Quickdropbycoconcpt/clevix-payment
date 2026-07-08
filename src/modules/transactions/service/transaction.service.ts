@@ -201,6 +201,36 @@ export class TransactionService {
     }
   }
 
+  async updateTransactionBySourceId(
+    sourceId: string,
+    input: UpdateTransactionInput,
+    entityManager?: EntityManager,
+  ): Promise<Transactions> {
+    const repository =
+      entityManager?.getRepository(Transactions) ?? this.transactionRepo;
+    const transaction = await repository.findOne({
+      where: { sourceId },
+    });
+
+    if (!transaction) {
+      throw new BadRequestException('Transaction not found');
+    }
+
+    repository.merge(transaction, this.getTransactionUpdatePayload(input));
+
+    try {
+      return await repository.save(transaction);
+    } catch (error) {
+      if (this.isUniqueViolation(error)) {
+        throw new ConflictException(
+          'Transaction reference or idempotency key already exists',
+        );
+      }
+
+      throw error;
+    }
+  }
+
   async getTransactionByMerchantRef(
     merchantReference: string,
     entityManager?: EntityManager,

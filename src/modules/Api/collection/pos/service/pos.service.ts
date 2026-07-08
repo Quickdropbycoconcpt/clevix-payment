@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Crypto from 'node:crypto';
@@ -210,8 +214,24 @@ export class PosService {
     return result;
   }
 
-  async incomingWebhook(body: any, provider: string) {
-    console.log(body);
+  async incomingWebhook(body: unknown, provider: string) {
+    const adapter = this.collectionAdapterFactory.getPosAdapter(provider);
+    const event = adapter.parsePosWebhook(body);
+
+    const posTransaction = await this.posTransactionsRepo.findOne({
+      where: { rrn: event.rrn?.trim(), stan: event.stan?.trim() },
+    });
+
+    if (!posTransaction) {
+      throw new NotFoundException('POS transaction not found');
+    }
+
+    await this.transactionService.updateTransactionBySourceId(
+      posTransaction.posTransactionId,
+      { providerReference: event.reference },
+    );
+
+    return event;
   }
 
   private resolveExecutionStatus(result: ChargePosResult): TransactionStatus {

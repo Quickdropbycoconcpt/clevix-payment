@@ -46,14 +46,21 @@ export class WalletService {
     try {
       const { reference, environment, amount, businessId, currency, provider } =
         input;
-      /***
-       * Early return for already successful transactions
+      /**
+       * Early return for already successful transactions. Keyed off the
+       * merchant reference (not our own `reference`) because callers like
+       * the POS charge flow mint a fresh internal reference on every
+       * attempt, so checking `reference` alone would never catch a retry.
        */
-      // const isProcessed =
-      //   await this.txnService.getSuccessfulTransaction(reference);
-      // if (isProcessed) {
-      //   return;
-      // }
+      const dedupeReference = input.merchantReference ?? reference;
+      const isProcessed =
+        await this.txnService.getSuccessfulTransaction(dedupeReference);
+      if (isProcessed) {
+        this.logger.warn(
+          `Skipping duplicate wallet credit for merchantReference=${dedupeReference}, businessId=${businessId}`,
+        );
+        return isProcessed;
+      }
       const { providerFee, chargedFee: merchantFee } =
         await this.feeConfigService.getFeeBySource(
           input.source,

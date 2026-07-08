@@ -36,13 +36,6 @@ type VfdCreateVirtualAccountResponse = {
   bankName: string;
 };
 
-type VfdChargePosResponse = {
-  reference: string;
-  amount: string;
-  currency: string;
-  status: string;
-};
-
 @Injectable()
 export class VfdClient {
   constructor(private readonly httpService: HttpService) {}
@@ -169,7 +162,6 @@ export class VfdClient {
       latitude: null,
       longitude: null,
     };
-    console.log(payload);
     const encrypted = tripleDESEncrypt(JSON.stringify(payload), sessionId);
     const cardCharge = await firstValueFrom(
       this.httpService.post(
