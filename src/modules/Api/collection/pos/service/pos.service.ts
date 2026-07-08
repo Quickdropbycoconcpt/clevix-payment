@@ -30,6 +30,11 @@ const CURRENCY_NAME_TO_ISO_CODE: Record<string, string> = {
   NAIRA: 'NGN',
 };
 
+type ChargePosResponse = ChargePosResult & {
+  rrn: string;
+  stan: string;
+};
+
 @Injectable()
 export class PosService {
   constructor(
@@ -45,7 +50,7 @@ export class PosService {
   async chargePos(
     dto: ChargePosDto,
     scope: RequestScope,
-  ): Promise<ChargePosResult> {
+  ): Promise<ChargePosResponse> {
     const referenceExist =
       await this.transactionService.getTransactionByMerchantRef(dto.reference);
     if (referenceExist) {
@@ -211,7 +216,7 @@ export class PosService {
       },
     );
 
-    return result;
+    return { ...result, rrn, stan };
   }
 
   async incomingWebhook(body: unknown, provider: string) {
