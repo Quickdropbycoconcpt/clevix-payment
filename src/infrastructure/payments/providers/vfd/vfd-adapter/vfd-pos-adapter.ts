@@ -44,7 +44,6 @@ export class VfdPosProvider implements PosAdapter {
 
   parsePosWebhook(body: VfdPosWebhookBody): PosWebhookEvent {
     const { bin, lastFour } = this.splitMaskedPan(body?.pan);
-
     return {
       reference: body?.reference,
       rrn: body?.rrn,
@@ -66,7 +65,6 @@ export class VfdPosProvider implements PosAdapter {
 
   private splitMaskedPan(pan?: string): { bin: string; lastFour: string } {
     const match = /^(\d+)\*+(\d+)$/.exec(pan ?? '');
-
     return {
       bin: match?.[1] ?? '',
       lastFour: match?.[2] ?? '',
