@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Crypto from 'node:crypto';
+import type { TransactionType } from 'src/shared/encryption';
 import { BusinessService } from 'src/modules/businesses/service/business.service';
 import { TransactionService } from 'src/modules/transactions/service/transaction.service';
 import { WalletService } from 'src/modules/wallets/service/wallets.service';
@@ -105,28 +106,28 @@ export class PosService {
     } = dto;
     const rrn = generateRrn();
     const stan = randomNumber(6);
-    const reference = dto.reference;
+    const reference = dto.reference.trim();
     const currency = this.normalizeCurrency(dto.currency);
 
     const result = await adapter.chargePos({
       ...businessScope,
-      iccData,
-      pan,
-      cardExpiryDate,
-      source,
-      accountType,
-      sequenceNumber,
-      serialNumber,
+      iccData: iccData.trim(),
+      pan: pan.trim(),
+      cardExpiryDate: cardExpiryDate.trim(),
+      source: source.trim() as TransactionType,
+      accountType: accountType.trim(),
+      sequenceNumber: sequenceNumber.trim(),
+      serialNumber: serialNumber.trim(),
       acquiringInstitutionalCode: '53998359',
       rrn,
       stan,
-      track2Data,
+      track2Data: track2Data.trim(),
       type: 'CARD',
-      pin,
+      pin: pin?.trim(),
       latitude: 0,
       longitude: 0,
       reference,
-      amount: dto.amount,
+      amount: dto.amount.trim(),
       currency,
       customerEmail: dto.customerEmail?.trim().toLowerCase(),
     });

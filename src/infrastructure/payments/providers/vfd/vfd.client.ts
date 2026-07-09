@@ -162,8 +162,6 @@ export class VfdClient {
       latitude: null,
       longitude: null,
     };
-    console.log(payload);
-    return;
     const encrypted = tripleDESEncrypt(JSON.stringify(payload), sessionId);
     const cardCharge = await firstValueFrom(
       this.httpService.post(
