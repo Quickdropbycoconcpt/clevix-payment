@@ -105,87 +105,95 @@ export class VfdClient {
   }
 
   async chargePos(input: ChargePosInput): Promise<ChargePosResult> {
-    const {
-      pan,
-      pin,
-      currency,
-      accountType,
-      amount,
-      cardExpiryDate,
-      source,
-      sequenceNumber,
-      serialNumber,
-      rrn,
-      stan,
-      iccData,
-      track2Data,
-    } = input;
-    const credentials = this.credentialPicker(input.environment);
-    const username = 'restdevice';
-    const password = '5NDM1NjckJV4KK';
-    const encodedbase64 = base64Encoded(`${username}:${password}`);
-    const response = await firstValueFrom(
-      this.httpService.post(
-        `${credentials.lux_url}/resd/network-mgt`,
+    try {
+      const {
+        pan,
+        pin,
+        currency,
+        accountType,
+        amount,
+        cardExpiryDate,
+        source,
+        sequenceNumber,
+        serialNumber,
+        rrn,
+        stan,
+        iccData,
+        track2Data,
+      } = input;
+      const credentials = this.credentialPicker(input.environment);
+      const username = credentials.pos_auth_username;
+      const password = credentials.pos_auth_password;
+      const encodedbase64 = base64Encoded(`${username}:${password}`);
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${credentials.lux_url}/resd/network-mgt`,
 
-        {
-          serialNumber,
-          stan: input.stan,
-          onlyAccountInfo: false,
-        },
-        {
-          headers: {
-            Authorization: `Basic ${encodedbase64}`,
+          {
+            serialNumber,
+            stan: input.stan,
+            onlyAccountInfo: false,
           },
-        },
-      ),
-    );
-    const { sessionId, terminalId, businessName, businessAddress } =
-      response.data.data;
-    const payload = {
-      pan,
-      stan,
-      rrn,
-      amount,
-      iccData,
-      track2Data,
-      postDataCode: buildPosDataCode(source),
-      cardExpiryDate,
-      acquiringInstitutionalCode: '53998359',
-      sequenceNumber,
-      pin,
-      accountType,
-      type: 'CARD',
-      transactionCurrency: 'NAIRA',
-      businessName,
-      businessAddress,
-      latitude: null,
-      longitude: null,
-    };
-    const encrypted = tripleDESEncrypt(JSON.stringify(payload), sessionId);
-    const cardCharge = await firstValueFrom(
-      this.httpService.post(
-        `${credentials.lux_url}/resd/transaction`,
-        encrypted,
-        {
-          headers: {
-            Authorization: `Basic ${encodedbase64}`,
-            terminalId,
-            sessionId,
-            'Content-Type': 'text/plain',
-            Accept: 'application/json',
+          {
+            headers: {
+              Authorization: `Basic ${encodedbase64}`,
+            },
           },
-        },
-      ),
-    );
-    const decryptedResponse = tripleDESDecrypt(cardCharge.data.data, sessionId);
-    const dv = JSON.parse(decryptedResponse);
-    return {
-      code: dv?.responseCode,
-      status: dv?.description,
-      amount: dv?.amount,
-      currency,
-    };
+        ),
+      );
+      const { sessionId, terminalId, businessName, businessAddress } =
+        response.data.data;
+      const payload = {
+        pan,
+        stan,
+        rrn,
+        amount,
+        iccData,
+        track2Data,
+        postDataCode: buildPosDataCode(source),
+        cardExpiryDate,
+        acquiringInstitutionalCode: '53998359',
+        sequenceNumber,
+        pin,
+        accountType,
+        type: 'CARD',
+        transactionCurrency: 'NAIRA',
+        businessName,
+        businessAddress,
+        latitude: null,
+        longitude: null,
+      };
+
+      const encrypted = tripleDESEncrypt(JSON.stringify(payload), sessionId);
+      const cardCharge = await firstValueFrom(
+        this.httpService.post(
+          `${credentials.lux_url}/resd/transaction`,
+          encrypted,
+          {
+            headers: {
+              Authorization: `Basic ${encodedbase64}`,
+              terminalId,
+              sessionId,
+              'Content-Type': 'text/plain',
+              Accept: 'application/json',
+            },
+          },
+        ),
+      );
+      const decryptedResponse = tripleDESDecrypt(
+        cardCharge.data.data,
+        sessionId,
+      );
+      const dv = JSON.parse(decryptedResponse);
+      return {
+        code: dv?.responseCode,
+        status: dv?.description,
+        amount: dv?.amount,
+        currency,
+      };
+    } catch (error: any) {
+      throw new BadRequestException(error.message);
+    }
   }
 
   private credentialPicker(environment: string): {
@@ -194,6 +202,8 @@ export class VfdClient {
     consumerKey: string;
     lux_url: string;
     consumerSecret: string;
+    pos_auth_username: string;
+    pos_auth_password: string;
   } {
     const url =
       environment == RequestEnvironment.TEST
@@ -204,6 +214,16 @@ export class VfdClient {
       environment == RequestEnvironment.TEST
         ? process.env.VFD_LUX_DEV_BASE_URL
         : process.env.VFD_LUX_LIVE_BASE_URL;
+
+    const pos_auth_username =
+      environment == RequestEnvironment.TEST
+        ? process.env.VFD_LUX_DEV_USERNAME
+        : process.env.VFD_LUX_LIVE_USERNAME;
+
+    const pos_auth_password =
+      environment == RequestEnvironment.TEST
+        ? process.env.VFD_LUX_DEV_PASSWORD
+        : process.env.VFD_LUX_LIVE_PASSWORD;
 
     const authUrl =
       environment == RequestEnvironment.TEST
@@ -220,7 +240,15 @@ export class VfdClient {
         ? process.env.VFD_DEV_CONSUMER_SECRET
         : process.env.VFD_LIVE_CONSUMER_SECRET;
 
-    return { walletUrl: url, consumerKey, consumerSecret, authUrl, lux_url };
+    return {
+      walletUrl: url,
+      consumerKey,
+      consumerSecret,
+      authUrl,
+      lux_url,
+      pos_auth_password,
+      pos_auth_username,
+    };
   }
 
   private async vfdVirtualAccountGeneration(body: CreateVirtualAccountInput) {
@@ -543,6 +571,7 @@ export class VfdClient {
             reference,
           };
     } catch (error) {
+      console.log(error);
       return { success: false, sessionId: null, reference: input.reference };
     }
   }

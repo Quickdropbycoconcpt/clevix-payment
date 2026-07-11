@@ -22,9 +22,6 @@ export class PosTransactions extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   accountOrItemId: string;
 
-  @Column({ type: 'varchar', nullable: true })
-  cardTxnId: string;
-
   @Index({ unique: true })
   @Column({ type: 'varchar' })
   rrn: string;
@@ -50,9 +47,6 @@ export class PosTransactions extends BaseEntity {
 
   @Column({ type: 'varchar', nullable: true })
   cardType: string;
-
-  @Column({ type: 'varchar', nullable: true })
-  serialNumber: string;
 
   @Column({ type: 'varchar', nullable: true })
   terminalId: string;

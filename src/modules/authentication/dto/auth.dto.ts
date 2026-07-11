@@ -40,8 +40,8 @@ export class CreateAccountDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'founder@clevix.com' })
-  @IsEmail()
+  @ApiProperty({ example: 'No 4 williams street ikirun' })
+  @IsString()
   businessAddress: string;
 
   @ApiProperty({ minLength: 8, example: 'StrongPass123!' })

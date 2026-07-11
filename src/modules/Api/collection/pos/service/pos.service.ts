@@ -232,10 +232,17 @@ export class PosService {
       throw new NotFoundException('POS transaction not found');
     }
 
-    await this.transactionService.updateTransactionBySourceId(
-      posTransaction.posTransactionId,
-      { providerReference: event.reference },
-    );
+    this.posTransactionsRepo.merge(posTransaction, {
+      cardType: event.cardType,
+    });
+
+    await Promise.all([
+      this.posTransactionsRepo.save(posTransaction),
+      this.transactionService.updateTransactionBySourceId(
+        posTransaction.posTransactionId,
+        { providerReference: event.reference },
+      ),
+    ]);
 
     return event;
   }
