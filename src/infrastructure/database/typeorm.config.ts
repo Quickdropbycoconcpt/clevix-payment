@@ -72,7 +72,7 @@ export const buildDataSourceOptions = (
       max: numberValue(env.DATABASE_POOL_MAX, 10),
     },
   };
-  console.log(env.DATABASE_HOST, 'HI host');
+  console.log(env.DATABASE_URL, 'HI url');
   const databaseUrl = stringValue(env.DATABASE_URL);
 
   if (databaseUrl) {
