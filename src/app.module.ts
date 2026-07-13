@@ -15,6 +15,7 @@ import { TransferModule } from './modules/Api/transfers/transfer.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { WebhookModule } from './modules/webhooks/webhook.module';
 import { TransactionModule } from './modules/transactions/transactions.module';
+import { KycModule } from './modules/kyc/kyc.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { TransactionModule } from './modules/transactions/transactions.module';
     TransferModule,
     TransactionModule,
     WebhookModule,
+    KycModule,
   ],
   controllers: [AppController],
   providers: [AppService],

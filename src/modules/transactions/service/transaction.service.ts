@@ -245,8 +245,14 @@ export class TransactionService {
     });
   }
 
-  async getSuccessfulTransaction(reference: string) {
-    return this.transactionRepo
+  async getSuccessfulTransaction(
+    reference: string,
+    entityManager?: EntityManager,
+  ) {
+    const repository =
+      entityManager?.getRepository(Transactions) ?? this.transactionRepo;
+
+    return repository
       .createQueryBuilder('txn')
       .where(
         new Brackets((qb) => {

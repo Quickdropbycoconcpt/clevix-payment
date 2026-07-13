@@ -42,6 +42,82 @@ export class VfdClient {
   private readonly serviceName = VfdClient.name;
   private readonly AUTH_CACHE_KEY = 'vfd_access_token';
   private readonly redis = new RedisConfig();
+
+  async bvnLookup(input: { bvn: string; environment: string }): Promise<{
+    firstName?: string;
+    lastName?: string;
+    middleName?: string;
+    dateOfBirth?: string;
+    phoneNumber?: string;
+    raw: unknown;
+  }> {
+    try {
+      const credentials = this.credentialPicker(input.environment);
+      const response = await this.withTokenRetry(input.environment, (token) =>
+        firstValueFrom(
+          this.httpService.get(
+            `${credentials.kycUrl}/client/bvn?bvn=${input.bvn}`,
+            axiosConfig(input.environment, token),
+          ),
+        ),
+      );
+
+      return {
+        firstName: response.data?.data?.firstname,
+        lastName: response.data?.data?.lastname,
+        middleName: response.data?.data?.middlename,
+        dateOfBirth: response.data?.data?.dateOfBirth,
+        phoneNumber: response.data?.data?.phoneNumber,
+        raw: response.data,
+      };
+    } catch (error: any) {
+      console.log(error);
+      throw new BadRequestException(
+        error?.response?.data?.message ?? error.message,
+        error,
+      );
+    }
+  }
+
+  async ninLookup(input: { nin: string; environment: string }): Promise<{
+    firstName?: string;
+    lastName?: string;
+    middleName?: string;
+    address: string;
+    dateOfBirth?: string;
+    phoneNumber?: string;
+    raw: unknown;
+  }> {
+    try {
+      const credentials = this.credentialPicker(input.environment);
+      const response = await this.withTokenRetry(input.environment, (token) =>
+        firstValueFrom(
+          this.httpService.post(
+            `${credentials.kycUrl}/verify/nin`,
+            { idNumber: input.nin },
+            axiosConfig(input.environment, token),
+          ),
+        ),
+      );
+
+      return {
+        firstName: response.data?.data?.firstName,
+        lastName: response.data?.data?.lastName,
+        middleName: response.data?.data?.middleName,
+        address: response.data?.data?.address,
+        dateOfBirth: response.data?.data?.dateOfBirth,
+        phoneNumber: response.data?.data?.phoneNumber,
+        raw: response.data,
+      };
+    } catch (error: any) {
+      console.log(error);
+      throw new BadRequestException(
+        error?.response?.data?.message ?? error.message,
+        error,
+      );
+    }
+  }
+
   async createVirtualAccount(
     input: CreateVirtualAccountInput,
   ): Promise<VfdCreateVirtualAccountResponse> {
@@ -201,6 +277,7 @@ export class VfdClient {
     authUrl: string;
     consumerKey: string;
     lux_url: string;
+    kycUrl: string;
     consumerSecret: string;
     pos_auth_username: string;
     pos_auth_password: string;
@@ -214,6 +291,11 @@ export class VfdClient {
       environment == RequestEnvironment.TEST
         ? process.env.VFD_LUX_DEV_BASE_URL
         : process.env.VFD_LUX_LIVE_BASE_URL;
+
+    const kycUrl =
+      environment == RequestEnvironment.TEST
+        ? process.env.VFD_DEV_KYC_URL
+        : process.env.VFD_LIVE_KYC_URL;
 
     const pos_auth_username =
       environment == RequestEnvironment.TEST
@@ -246,6 +328,7 @@ export class VfdClient {
       consumerSecret,
       authUrl,
       lux_url,
+      kycUrl,
       pos_auth_password,
       pos_auth_username,
     };
@@ -369,7 +452,7 @@ export class VfdClient {
 
   // Executes fn with a fresh token. If VFD returns 401, clears the cached
   // token and retries once with a newly authenticated token.
-  protected async withTokenRetry<T>(
+  async withTokenRetry<T>(
     environment: string,
     fn: (token: string) => Promise<T>,
   ): Promise<T> {
@@ -573,6 +656,46 @@ export class VfdClient {
     } catch (error) {
       console.log(error);
       return { success: false, sessionId: null, reference: input.reference };
+    }
+  }
+
+  async bvnImageMatch(input: {
+    bvn: string;
+    base64Image: string;
+    environment: string;
+  }): Promise<{
+    match: boolean;
+    confidence?: number;
+    raw: unknown;
+    bvn: string;
+  }> {
+    try {
+      const credentials = this.credentialPicker(input.environment);
+      const response = await this.withTokenRetry(input.environment, (token) =>
+        firstValueFrom(
+          this.httpService.post(
+            `${credentials.kycUrl}/image/match`,
+            {
+              bvn: input.bvn,
+              base64Image: input.base64Image,
+            },
+            axiosConfig(input.environment, token),
+          ),
+        ),
+      );
+
+      return {
+        match: response.data?.data?.isMatch ?? false,
+        confidence: response.data?.data?.similarityScore,
+        bvn: response.data?.data?.bvn,
+        raw: response.data,
+      };
+    } catch (error: any) {
+      console.log(error);
+      throw new BadRequestException(
+        error?.response?.data?.message ?? error.message,
+        error,
+      );
     }
   }
 }
