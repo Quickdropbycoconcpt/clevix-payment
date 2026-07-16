@@ -221,6 +221,7 @@ export class PosService {
   }
 
   async incomingWebhook(body: unknown, provider: string) {
+    console.log(body);
     const adapter = this.collectionAdapterFactory.getPosAdapter(provider);
     const event = adapter.parsePosWebhook(body);
 
