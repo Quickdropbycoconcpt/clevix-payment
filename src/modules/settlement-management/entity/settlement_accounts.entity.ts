@@ -3,7 +3,7 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('SettlementBankAccounts')
 export class SettlementBankAccounts extends BaseEntity {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn('uuid')
   bankAccountId: string;
 
   @Column({ type: 'varchar' })
