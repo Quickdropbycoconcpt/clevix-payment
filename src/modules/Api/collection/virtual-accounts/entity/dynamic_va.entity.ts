@@ -3,7 +3,10 @@ import { BasicStatus } from 'src/shared/enum';
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('dynamic_virtual_accounts')
-@Index(['accountNumber', 'provider', 'status'], { unique: true })
+@Index(['accountNumber', 'provider'], {
+  unique: true,
+  where: `"status" = 'ACTIVE'`,
+})
 export class DynamicVirtualAccounts extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   dvaId: string;
