@@ -18,6 +18,7 @@ import { TransactionModule } from './modules/transactions/transactions.module';
 import { KycModule } from './modules/kyc/kyc.module';
 import { ServiceCheckoutModule } from './modules/service-checkout/service-checkout.module';
 import { ServiceCheckoutInvoiceModule } from './modules/service-checkout-invoice/service-checkout-invoice.module';
+import { SettlementManagementModule } from './modules/settlement-management/settlement-management.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { ServiceCheckoutInvoiceModule } from './modules/service-checkout-invoice
     KycModule,
     ServiceCheckoutModule,
     ServiceCheckoutInvoiceModule,
+    SettlementManagementModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -26,6 +26,15 @@ import { Transactions } from 'src/modules/transactions/entity/transaction.entity
 import { FeeConfigurationService } from 'src/modules/fees-configuration/service/fees_revenue.service';
 import { TransactionFeesService } from 'src/modules/transaction_fees/service/transaction_fees.service';
 import { WebhookService } from 'src/modules/webhooks/service/webhook.service';
+import { BusinessSettlementConfigurationService } from 'src/modules/settlement-management/service/settlement_business_config.service';
+import {
+  BusinessSettlementType,
+  SettlementLocation,
+} from 'src/modules/settlement-management/entity/business_settlement_config.entity';
+import { TRANSACTION_SOURCE_TO_PAYMENT_SOURCE } from 'src/shared/constants/settlement.constants';
+import { SettlementAccountResolutionService } from 'src/modules/settlement-management/service/settlement-account-resolution.service';
+import { allocateSettlementShares } from 'src/shared/utils';
+import { SettlementTransactionsService } from 'src/modules/settlement-management/service/settlement-transactions.service';
 
 @Injectable()
 export class WalletService {
@@ -39,6 +48,9 @@ export class WalletService {
     private readonly txnFee: TransactionFeesService,
     private readonly feeConfigService: FeeConfigurationService,
     private readonly webhookService: WebhookService,
+    private readonly settlementConfigService: BusinessSettlementConfigurationService,
+    private readonly settlementAccountResolutionService: SettlementAccountResolutionService,
+    private readonly settlementTransactionsService: SettlementTransactionsService,
   ) {}
 
   async creditUserWallet(input: CreditWallet) {
@@ -187,13 +199,129 @@ export class WalletService {
             },
             entityManager,
           );
-          await entityManager
-            .createQueryBuilder()
-            .update(Wallets)
-            .set({ balance: () => 'balance + :amount' })
-            .where('walletId = :walletId', { walletId: wallet.walletId })
-            .setParameter('amount', netAmount.toString())
-            .execute();
+          const paymentSource =
+            TRANSACTION_SOURCE_TO_PAYMENT_SOURCE[input.source];
+
+          const settlementConfig = paymentSource
+            ? await this.settlementConfigService.getConfig(
+                { businessId, environment },
+                paymentSource,
+              )
+            : null;
+
+          /**
+           * Ask feature resolvers (invoice, etc.) whether this reference is
+           * attached to anything with its own settlement routing. Safe to
+           * call unconditionally — resolve() is a no-op returning
+           * `undefined` when nothing claims the reference, e.g. a plain
+           * POS/virtual-account credit with no invoice behind it. Each
+           * allocation carries a (possibly null) account and its share of
+           * the gross amount, since one invoice can legitimately route
+           * different items to different settlement accounts.
+           */
+          const allocations =
+            await this.settlementAccountResolutionService.resolve(
+              dedupeReference,
+            );
+
+          /**
+           * A real (non-null) account override always forces deferral — it
+           * can never be instant, since routing to a specific bank account
+           * is never "instant" the way crediting the wallet is.
+           */
+          const hasAccountOverride = (allocations ?? []).some(
+            (allocation) => allocation.settlementBankAccountId !== null,
+          );
+
+          /**
+           * No config, or explicitly INSTANT (which the DB constraint
+           * guarantees only ever pairs with WALLET) both mean: credit the
+           * spendable balance right now, same as before settlement
+           * routing existed — unless a specific account override says
+           * otherwise.
+           */
+          const shouldCreditWalletNow =
+            !hasAccountOverride &&
+            (!settlementConfig ||
+              settlementConfig.settlementType ===
+                BusinessSettlementType.INSTANT);
+
+          if (shouldCreditWalletNow) {
+            await entityManager
+              .createQueryBuilder()
+              .update(Wallets)
+              .set({ balance: () => 'balance + :amount' })
+              .where('walletId = :walletId', { walletId: wallet.walletId })
+              .setParameter('amount', netAmount.toString())
+              .execute();
+          } else {
+            /**
+             * T+1 (WALLET or BANK), or a specific account override: don't
+             * touch the spendable balance yet. The nightly settlement job
+             * is what eventually credits it (T+1+WALLET) or pays out to
+             * the bank (T+1+BANK / override account).
+             */
+            if (!paymentSource) {
+              throw new BadRequestException(
+                `Cannot defer settlement for unmapped transaction source: ${input.source}`,
+              );
+            }
+
+            const settlementType =
+              settlementConfig?.settlementType ??
+              BusinessSettlementType.T_PLUS_1;
+
+            /**
+             * No allocations at all means nothing claimed this reference —
+             * one implicit bucket for the whole credit, routed by general
+             * config alone. Uses `totalAmount` (gross), not `netAmount`,
+             * since the fee gets subtracted per-allocation below.
+             */
+            const effectiveAllocations = allocations?.length
+              ? allocations
+              : [
+                  {
+                    settlementBankAccountId: null,
+                    grossAmount: totalAmount.toString(),
+                  },
+                ];
+
+            const shares = allocateSettlementShares(
+              effectiveAllocations,
+              merchantFee,
+            );
+
+            for (const { settlementBankAccountId, amount } of shares) {
+              if (amount <= 0n) {
+                continue;
+              }
+
+              if (
+                !settlementBankAccountId &&
+                settlementConfig?.settlementLocation === SettlementLocation.BANK
+              ) {
+                // TODO: general (non-override) BANK settlement still needs
+                // a way to resolve *which* SettlementBankAccounts row a
+                // business's default config should pay out to — this
+                // config only says WALLET vs BANK, not a specific account.
+                throw new BadRequestException(
+                  'Business settlement configuration resolves to BANK but has no settlement account to route to',
+                );
+              }
+
+              await this.settlementTransactionsService.upsertUnsettledBucket(
+                {
+                  businessId,
+                  environment,
+                  paymentSource,
+                  settlementType,
+                  settlementBankAccountId,
+                  amount,
+                },
+                entityManager,
+              );
+            }
+          }
 
           const isTransaction =
             await this.txnService.getTransactionBySystemReference(
@@ -219,7 +347,9 @@ export class WalletService {
                   settledAmount: netAmount.toString(),
                   fee: merchantFee.toString(),
                   executionStatus: TransactionStatus.SUCCESS,
-                  settlementStatus: TransactionSettlementStatus.SETTLED,
+                  settlementStatus: shouldCreditWalletNow
+                    ? TransactionSettlementStatus.SETTLED
+                    : TransactionSettlementStatus.UNSETTLED,
                   riskStatus: TransactionRiskStatus.CLEAR,
                   merchantReference:
                     input.merchantReference ?? isTransaction.merchantReference,
@@ -247,7 +377,9 @@ export class WalletService {
                 executionStatus: TransactionStatus.SUCCESS,
                 merchantReference: input.merchantReference ?? input.reference,
                 providerReference: input.providerReference ?? input.reference,
-                settlementStatus: TransactionSettlementStatus.SETTLED,
+                settlementStatus: shouldCreditWalletNow
+                  ? TransactionSettlementStatus.SETTLED
+                  : TransactionSettlementStatus.UNSETTLED,
                 riskStatus: TransactionRiskStatus.CLEAR,
                 direction: LedgerEntryDirection.CREDIT,
                 idempotencyKey: `wallet-credit:${businessId}:${input.reference}`,

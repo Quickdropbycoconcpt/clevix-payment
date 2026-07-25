@@ -27,6 +27,7 @@ export class VirtualAccountCreditProcessor extends WorkerHost {
     this.logger.log(
       `Processing virtual account credit job ${job.id} for ${job.data.merchantReference}`,
     );
+
     try {
       const {
         businessId,

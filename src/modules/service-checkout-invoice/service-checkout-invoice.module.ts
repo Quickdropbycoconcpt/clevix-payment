@@ -14,8 +14,10 @@ import { PosInvoicePaymentInitiator } from './initiators/pos-invoice-payment.ini
 import { TransferInvoicePaymentInitiator } from './initiators/transfer-invoice-payment.initiator';
 import { ReconciliationModule } from 'src/modules/reconciliation/reconciliation.module';
 import { InvoiceReconciliationHandler } from './reconciliation/invoice-reconciliation.handler';
+import { InvoiceSettlementAccountResolver } from './reconciliation/invoice-settlement-account.resolver';
 import { FeesModule } from '../fees-configuration/fees.module';
 import { InvoiceFeeService } from './fee/invoice-fee.service';
+import { SettlementManagementModule } from '../settlement-management/settlement-management.module';
 
 @Module({
   imports: [
@@ -30,6 +32,7 @@ import { InvoiceFeeService } from './fee/invoice-fee.service';
     VirtualAccountsModule,
     ReconciliationModule,
     FeesModule,
+    SettlementManagementModule,
   ],
   controllers: [ServiceInvoiceCheckoutController],
   providers: [
@@ -39,6 +42,7 @@ import { InvoiceFeeService } from './fee/invoice-fee.service';
     TransferInvoicePaymentInitiator,
     InvoiceFeeService,
     InvoiceReconciliationHandler,
+    InvoiceSettlementAccountResolver,
   ],
 })
 export class ServiceCheckoutInvoiceModule {}

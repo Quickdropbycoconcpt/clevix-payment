@@ -143,3 +143,72 @@ export function generateRrn(): string {
   const random = randomNumber(4); // 4 random digits
   return `${timestamp}${random}`; // 12 digits total
 }
+
+export type SettlementSharingAllocation = {
+  settlementBankAccountId: string | null;
+  grossAmount: string;
+};
+
+export type SettlementShare = {
+  settlementBankAccountId: string | null;
+  amount: bigint;
+};
+
+/**
+ * Fee-first, Hamilton's method: floors each allocation's own fee share
+ * first (merchantFee * grossAmount_i / totalGrossAmount) — which always
+ * undershoots `merchantFee` by a few kobo, since integer division
+ * truncates — then hands out that shortfall one kobo at a time to
+ * whichever allocation's fee lost the most to flooring (largest fee
+ * remainder first). Once fees sum to exactly `merchantFee`,
+ * `grossAmount - fee` per allocation automatically sums to exactly
+ * `totalGrossAmount - merchantFee`, since the allocations' gross amounts
+ * already sum to exactly `totalGrossAmount`.
+ */
+export function allocateSettlementShares(
+  allocations: SettlementSharingAllocation[],
+  merchantFee: bigint,
+): SettlementShare[] {
+  const totalGrossAmount = allocations.reduce(
+    (sum, allocation) => sum + BigInt(allocation.grossAmount),
+    0n,
+  );
+
+  if (totalGrossAmount <= 0n) {
+    throw new BadRequestException(
+      'Settlement allocations have no gross amount to prorate against',
+    );
+  }
+
+  const feeShares = allocations.map((allocation) => {
+    const grossAmount = BigInt(allocation.grossAmount);
+    const feeProduct = merchantFee * grossAmount;
+
+    return {
+      settlementBankAccountId: allocation.settlementBankAccountId,
+      grossAmount,
+      fee: feeProduct / totalGrossAmount,
+      feeRemainder: feeProduct % totalGrossAmount,
+    };
+  });
+
+  const flooredFeeTotal = feeShares.reduce(
+    (sum, entry) => sum + entry.fee,
+    0n,
+  );
+  let feeLeftover = merchantFee - flooredFeeTotal;
+
+  const byFeeRemainderDesc = [...feeShares].sort((a, b) =>
+    b.feeRemainder > a.feeRemainder ? 1 : b.feeRemainder < a.feeRemainder ? -1 : 0,
+  );
+
+  for (let i = 0; i < byFeeRemainderDesc.length && feeLeftover > 0n; i++) {
+    byFeeRemainderDesc[i].fee += 1n;
+    feeLeftover -= 1n;
+  }
+
+  return feeShares.map(({ settlementBankAccountId, grossAmount, fee }) => ({
+    settlementBankAccountId,
+    amount: grossAmount - fee,
+  }));
+}

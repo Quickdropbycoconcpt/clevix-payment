@@ -1,4 +1,4 @@
-import { Column } from 'typeorm';
+import { Column, DeleteDateColumn } from 'typeorm';
 
 export class BaseEntity {
   @Column({ type: 'uuid' })
@@ -17,7 +17,7 @@ export class BaseEntity {
   })
   updatedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @DeleteDateColumn({ type: 'timestamp' })
   deletedAt: Date;
 }
 export class NonEnvironmentBaseEntity {
@@ -31,7 +31,7 @@ export class NonEnvironmentBaseEntity {
   })
   updatedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @DeleteDateColumn({ type: 'timestamp' })
   deletedAt: Date;
 }
 
@@ -49,6 +49,6 @@ export class OwnerlessBaseEntity {
   })
   updatedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @DeleteDateColumn({ type: 'timestamp' })
   deletedAt: Date;
 }

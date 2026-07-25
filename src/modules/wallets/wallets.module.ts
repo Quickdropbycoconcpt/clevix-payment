@@ -8,6 +8,7 @@ import { TransactionModule } from '../transactions/transactions.module';
 import { FeesModule } from '../fees-configuration/fees.module';
 import { TransactionFeesModule } from '../transaction_fees/transaction-fees.module';
 import { WebhookModule } from '../webhooks/webhook.module';
+import { SettlementManagementModule } from '../settlement-management/settlement-management.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { WebhookModule } from '../webhooks/webhook.module';
     TransactionModule,
     TransactionFeesModule,
     WebhookModule,
+    SettlementManagementModule,
   ],
   controllers: [WalletController],
   providers: [WalletService],
