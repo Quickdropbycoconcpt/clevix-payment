@@ -12,7 +12,8 @@ import { Businesses } from '../businesses/entity/business.entity';
 import { InvoicePaymentInitiatorFactory } from './initiators/invoice-payment-initiator.factory';
 import { PosInvoicePaymentInitiator } from './initiators/pos-invoice-payment.initiator';
 import { TransferInvoicePaymentInitiator } from './initiators/transfer-invoice-payment.initiator';
-import { InvoiceReconciliationModule } from './reconciliation/invoice-reconciliation.module';
+import { ReconciliationModule } from 'src/modules/reconciliation/reconciliation.module';
+import { InvoiceReconciliationHandler } from './reconciliation/invoice-reconciliation.handler';
 import { FeesModule } from '../fees-configuration/fees.module';
 import { InvoiceFeeService } from './fee/invoice-fee.service';
 
@@ -27,7 +28,7 @@ import { InvoiceFeeService } from './fee/invoice-fee.service';
     ServiceCheckoutModule,
     PosModule,
     VirtualAccountsModule,
-    InvoiceReconciliationModule,
+    ReconciliationModule,
     FeesModule,
   ],
   controllers: [ServiceInvoiceCheckoutController],
@@ -37,6 +38,7 @@ import { InvoiceFeeService } from './fee/invoice-fee.service';
     PosInvoicePaymentInitiator,
     TransferInvoicePaymentInitiator,
     InvoiceFeeService,
+    InvoiceReconciliationHandler,
   ],
 })
 export class ServiceCheckoutInvoiceModule {}

@@ -9,7 +9,7 @@ import { WalletService } from 'src/modules/wallets/service/wallets.service';
 import { TransactionSource } from 'src/shared/enum';
 import { MoneyValueConverter } from 'src/shared/converter';
 import { WebhookService } from 'src/modules/webhooks/service/webhook.service';
-import { InvoiceReconciliationService } from 'src/modules/service-checkout-invoice/reconciliation/invoice-reconciliation.service';
+import { ReconciliationService } from 'src/modules/reconciliation/reconciliation.service';
 
 @Injectable()
 @Processor(VIRTUAL_ACCOUNT_CREDIT_QUEUE)
@@ -17,7 +17,7 @@ export class VirtualAccountCreditProcessor extends WorkerHost {
   constructor(
     private readonly webhookService: WebhookService,
     private readonly walletService: WalletService,
-    private readonly reconciliationService: InvoiceReconciliationService,
+    private readonly reconciliationService: ReconciliationService,
   ) {
     super();
   }

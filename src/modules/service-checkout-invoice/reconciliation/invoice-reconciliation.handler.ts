@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TransactionService } from 'src/modules/transactions/service/transaction.service';
 import { WebhookService } from 'src/modules/webhooks/service/webhook.service';
 import { TransactionSource, TransactionStatus } from 'src/shared/enum';
+import { Transactions } from 'src/modules/transactions/entity/transaction.entity';
+import { ReconciliationService } from 'src/modules/reconciliation/reconciliation.service';
+import { ReconciliationHandler } from 'src/modules/reconciliation/reconciliation-handler.interface';
 import {
   InvoiceStatus,
   OrganisationInvoice,
@@ -11,31 +13,33 @@ import {
 import { InvoicePaymentTransaction } from '../entity/invoice_transaction.entity';
 
 @Injectable()
-export class InvoiceReconciliationService {
+export class InvoiceReconciliationHandler
+  implements ReconciliationHandler, OnModuleInit
+{
   constructor(
     @InjectRepository(OrganisationInvoice)
     private readonly invoiceRepo: Repository<OrganisationInvoice>,
     @InjectRepository(InvoicePaymentTransaction)
     private readonly invoiceTxn: Repository<InvoicePaymentTransaction>,
-    private readonly transactionService: TransactionService,
     private readonly webhookService: WebhookService,
+    private readonly reconciliationService: ReconciliationService,
   ) {}
 
-  async reconcile(invoiceTxnId: string) {
+  onModuleInit(): void {
+    this.reconciliationService.registerHandler(this);
+  }
+
+  async handle(
+    merchantRef: string,
+    transaction: Transactions,
+  ): Promise<boolean> {
     const attempt = await this.invoiceTxn.findOne({
-      where: { invoicePaymentTransactionId: invoiceTxnId },
+      where: { invoicePaymentTransactionId: merchantRef },
       relations: { invoice: true },
     });
 
     if (!attempt) {
-      return;
-    }
-
-    const transaction =
-      await this.transactionService.getTransactionByMerchantRef(invoiceTxnId);
-
-    if (!transaction) {
-      return;
+      return false;
     }
 
     attempt.transactionId = transaction.transactionId;
@@ -63,5 +67,7 @@ export class InvoiceReconciliationService {
         },
       });
     }
+
+    return true;
   }
 }

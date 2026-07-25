@@ -29,7 +29,7 @@ import {
 } from 'src/modules/service-checkout/entity/service_payment_form.entity';
 import * as Crypto from 'node:crypto';
 import { isEmail } from 'class-validator';
-import { InvoiceReconciliationService } from '../reconciliation/invoice-reconciliation.service';
+import { ReconciliationService } from 'src/modules/reconciliation/reconciliation.service';
 import { WebhookService } from 'src/modules/webhooks/service/webhook.service';
 import { TransactionSource, TransactionStatus } from 'src/shared/enum';
 import { InvoiceFeeService } from '../fee/invoice-fee.service';
@@ -47,7 +47,7 @@ export class OrganisationInvoiceService {
     private readonly invoiceRepo: Repository<OrganisationInvoice>,
     private readonly serviceService: ServiceCheckout,
     private readonly initiatorFactory: InvoicePaymentInitiatorFactory,
-    private readonly reconciliationService: InvoiceReconciliationService,
+    private readonly reconciliationService: ReconciliationService,
     private readonly webhookService: WebhookService,
     private readonly feeService: InvoiceFeeService,
     @InjectRepository(Businesses)

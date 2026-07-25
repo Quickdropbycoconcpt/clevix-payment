@@ -11,7 +11,7 @@ import { VirtualAccountCreditProcessor } from './jobs/virtual-account-credit.pro
 import { VirtualAccountCreditQueue } from './jobs/virtual-account-credit.queue';
 import { WalletModule } from 'src/modules/wallets/wallets.module';
 import { TransactionModule } from 'src/modules/transactions/transactions.module';
-import { InvoiceReconciliationModule } from 'src/modules/service-checkout-invoice/reconciliation/invoice-reconciliation.module';
+import { ReconciliationModule } from 'src/modules/reconciliation/reconciliation.module';
 import { StaticWalletAccounts } from './entity/wallet_account.entity';
 
 @Module({
@@ -23,7 +23,7 @@ import { StaticWalletAccounts } from './entity/wallet_account.entity';
     VfdModule,
     TransactionModule,
     WalletModule,
-    InvoiceReconciliationModule,
+    ReconciliationModule,
   ],
   controllers: [VirtualAccountsController],
   providers: [
