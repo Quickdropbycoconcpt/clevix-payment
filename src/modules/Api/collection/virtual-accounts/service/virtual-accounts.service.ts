@@ -92,6 +92,7 @@ export class VirtualAccountsService {
         businessId: scope.businessId,
         validityTime,
         environment: scope.environment,
+        feeCharged: dto.feeCharged,
       });
       await entityManager.save(dva);
       await this.txnService.createTransaction(
@@ -303,6 +304,7 @@ export class VirtualAccountsService {
       merchantReference:
         dva?.merchantReference ?? result.reference ?? result.sessionId,
       credit: result,
+      feeCharged: dva?.feeCharged,
     });
 
     return {

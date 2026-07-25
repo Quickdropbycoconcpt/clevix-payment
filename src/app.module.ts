@@ -16,6 +16,8 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { WebhookModule } from './modules/webhooks/webhook.module';
 import { TransactionModule } from './modules/transactions/transactions.module';
 import { KycModule } from './modules/kyc/kyc.module';
+import { ServiceCheckoutModule } from './modules/service-checkout/service-checkout.module';
+import { ServiceCheckoutInvoiceModule } from './modules/service-checkout-invoice/service-checkout-invoice.module';
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { KycModule } from './modules/kyc/kyc.module';
     TransactionModule,
     WebhookModule,
     KycModule,
+    ServiceCheckoutModule,
+    ServiceCheckoutInvoiceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

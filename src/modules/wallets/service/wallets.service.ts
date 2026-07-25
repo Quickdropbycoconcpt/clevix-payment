@@ -58,6 +58,9 @@ export class WalletService {
           businessId,
           provider,
           amount,
+          input.feeCharged
+            ? { feature: input.source, feeCollected: input.feeCharged }
+            : undefined,
         );
       const totalAmount = BigInt(amount);
       const settledAmount = totalAmount - providerFee;

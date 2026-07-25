@@ -8,9 +8,6 @@ export class DynamicVirtualAccounts extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   dvaId: string;
 
-  @Column({ type: 'uuid' })
-  businessId: string;
-
   @Column({ type: 'varchar' })
   accountNumber: string;
 
@@ -30,4 +27,7 @@ export class DynamicVirtualAccounts extends BaseEntity {
 
   @Column({ type: 'int', default: 2400 })
   validityTime: number;
+
+  @Column({ type: 'bigint', nullable: true })
+  feeCharged: string;
 }

@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm';
 import AppDataSource from '../database/typeorm.data-source';
 import { seedNigeria } from './nigeria';
 import { seedPermissions } from './permissions';
+import { seedPlatformMandatoryFields } from './platform-mandatory-fields';
 
 type Seeder = {
   name: string;
@@ -16,6 +17,10 @@ const seeders: Seeder[] = [
   {
     name: 'Nigeria country, states and LGAs',
     run: seedNigeria,
+  },
+  {
+    name: 'Platform mandatory fields',
+    run: seedPlatformMandatoryFields,
   },
 ];
 

@@ -12,4 +12,5 @@ export type VirtualAccountCreditJobData = {
   provider: string;
   merchantReference: string;
   credit: VirtualAccountCreditResponse;
+  feeCharged?: string;
 };

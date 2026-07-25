@@ -7,9 +7,6 @@ export class PosTransactions extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   posTransactionId: string;
 
-  @Column({ type: 'uuid' })
-  businessId: string;
-
   @Column({ type: 'varchar', nullable: true })
   merchantIdentifier: string;
 

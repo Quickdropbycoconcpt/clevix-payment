@@ -172,6 +172,7 @@ export class PosService {
         merchantReference: reference,
         sourceId: posTransaction.posTransactionId,
         metadata: { raw: result.raw },
+        feeCharged: dto.feeCharged,
       });
     } else {
       await this.transactionService.createTransaction({

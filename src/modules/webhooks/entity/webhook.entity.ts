@@ -12,7 +12,7 @@ import { WebhooksSnapshot } from './webhook_snapshot.entity';
 @Index(
   'IDX_webhooks_business_environment_type',
   ['businessId', 'environment', 'type'],
-  { unique: true, where: '"deleteAt" IS NULL' },
+  { unique: true, where: '"deletedAt" IS NULL' },
 )
 @Entity('webhooks')
 export class Webhooks extends BaseEntity {
@@ -30,9 +30,6 @@ export class Webhooks extends BaseEntity {
 
   @Column({ type: 'varchar', nullable: true })
   secret: string;
-
-  @Column({ type: 'uuid' })
-  businessId: string;
 
   @OneToMany(() => WebhooksSnapshot, (snapshot) => snapshot.webhook)
   snapshots: WebhooksSnapshot[];

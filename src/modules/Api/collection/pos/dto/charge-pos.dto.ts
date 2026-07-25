@@ -6,6 +6,7 @@ import {
   IsNumberString,
   IsOptional,
   IsString,
+  Matches,
 } from 'class-validator';
 import type { TransactionType } from 'src/shared/encryption';
 import { PosChargePurpose } from 'src/shared/enum';
@@ -17,6 +18,9 @@ export class ChargePosDto {
 
   @IsNumberString()
   @IsNotEmpty()
+  @Matches(/^[1-9]\d*$/, {
+    message: 'amount must be a positive integer string',
+  })
   amount: string;
 
   @IsString()
@@ -94,4 +98,12 @@ export class ChargePosDto {
   @IsOptional()
   @IsString()
   accountOrItemId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Fee already computed and included in `amount` upstream (e.g. a customer-borne checkout fee). When set, the wallet credit uses this instead of recomputing a fee off `amount`.',
+  })
+  @IsOptional()
+  @IsNumberString()
+  feeCharged?: string;
 }

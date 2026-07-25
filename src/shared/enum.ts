@@ -17,6 +17,7 @@ export enum TransactionSource {
   BILLS_PAYMENT_FEE = 'BILLS_PAYMENT_FEE',
   TRANSFER_FEE = 'TRANSFER_FEE',
   STAMP_DUTY = 'STAMP_DUTY',
+  CHECKOUT_INVOICE = 'CHECKOUT_INVOICE',
 }
 
 export enum PosChargePurpose {

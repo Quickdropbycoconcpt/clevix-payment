@@ -21,9 +21,6 @@ export class Key extends BaseEntity {
   @Column({ type: 'varchar' })
   keyHash: string;
 
-  @Column({ type: 'uuid' })
-  businessId: string;
-
   @ManyToOne(() => Businesses, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'businessId' })
   business: Businesses;

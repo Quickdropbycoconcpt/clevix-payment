@@ -1,4 +1,4 @@
-import { BaseEntity } from 'src/infrastructure/database/base_entiy';
+import { OwnerlessBaseEntity } from 'src/infrastructure/database/base_entiy';
 import {
   Column,
   Entity,
@@ -10,7 +10,7 @@ import { LedgerTransactionStatus } from '../enums/ledger.enums';
 import { LedgerEntry } from './ledger-entry.entity';
 
 @Entity('ledger_transactions')
-export class LedgerTransaction extends BaseEntity {
+export class LedgerTransaction extends OwnerlessBaseEntity {
   @PrimaryGeneratedColumn('uuid')
   ledgerTransactionId: string;
 

@@ -23,9 +23,6 @@ export class WebhooksSnapshot extends BaseEntity {
   @Column({ type: 'uuid' })
   webhookId: string;
 
-  @Column({ type: 'uuid' })
-  businessId: string;
-
   @Column({ type: 'uuid', nullable: true })
   transactionId: string;
 

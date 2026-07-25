@@ -1,4 +1,4 @@
-import { BaseEntity } from 'src/infrastructure/database/base_entiy';
+import { OwnerlessBaseEntity } from 'src/infrastructure/database/base_entiy';
 import {
   Column,
   Entity,
@@ -16,7 +16,7 @@ import { LedgerEntry } from './ledger-entry.entity';
 @Index(['ownerType', 'ownerId', 'accountType', 'currency', 'environment'], {
   unique: true,
 })
-export class LedgerAccount extends BaseEntity {
+export class LedgerAccount extends OwnerlessBaseEntity {
   @PrimaryGeneratedColumn('uuid')
   ledgerAccountId: string;
 

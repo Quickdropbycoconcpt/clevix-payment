@@ -33,6 +33,7 @@ export class FeeConfigurationService {
     businessId: string,
     provider: string,
     amount: FeeAmount,
+    precomputedFee?: { feature: string; feeCollected: FeeAmount },
   ): Promise<{ providerFee: bigint; chargedFee: bigint; provider: string }> {
     const normalizedProvider = provider.trim();
     const normalizedFeeSource = feeSource.trim();
@@ -64,6 +65,17 @@ export class FeeConfigurationService {
       },
       amountInKobo,
     );
+
+    if (precomputedFee) {
+      return {
+        providerFee,
+        chargedFee: toIntegerAmountBigInt(
+          precomputedFee.feeCollected,
+          'feeCollected',
+        ),
+        provider: platformConfig.provider,
+      };
+    }
 
     const platformChargedFee = this.calculateFee(
       {

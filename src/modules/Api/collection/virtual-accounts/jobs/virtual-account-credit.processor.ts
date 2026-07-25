@@ -9,6 +9,7 @@ import { WalletService } from 'src/modules/wallets/service/wallets.service';
 import { TransactionSource } from 'src/shared/enum';
 import { MoneyValueConverter } from 'src/shared/converter';
 import { WebhookService } from 'src/modules/webhooks/service/webhook.service';
+import { InvoiceReconciliationService } from 'src/modules/service-checkout-invoice/reconciliation/invoice-reconciliation.service';
 
 @Injectable()
 @Processor(VIRTUAL_ACCOUNT_CREDIT_QUEUE)
@@ -16,6 +17,7 @@ export class VirtualAccountCreditProcessor extends WorkerHost {
   constructor(
     private readonly webhookService: WebhookService,
     private readonly walletService: WalletService,
+    private readonly reconciliationService: InvoiceReconciliationService,
   ) {
     super();
   }
@@ -33,6 +35,7 @@ export class VirtualAccountCreditProcessor extends WorkerHost {
         provider,
         dvaId,
         merchantReference,
+        feeCharged,
       } = job.data;
       await this.walletService.creditUserWallet({
         businessId,
@@ -47,6 +50,7 @@ export class VirtualAccountCreditProcessor extends WorkerHost {
         sourceId: dvaId,
         merchantReference,
         providerReference: credit.reference,
+        feeCharged,
         metadata: {
           senderAccountNumber: credit.senderAccountNumber,
           senderName: credit.senderName,
@@ -55,6 +59,9 @@ export class VirtualAccountCreditProcessor extends WorkerHost {
           sessionId: credit.sessionId,
         },
       });
+
+      await this.reconciliationService.reconcile(merchantReference);
+
       /**
        * Dispatch virtual collection webhook to merchant
        */

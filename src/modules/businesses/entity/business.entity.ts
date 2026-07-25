@@ -1,4 +1,4 @@
-import { BaseEntity } from 'src/infrastructure/database/base_entiy';
+import { NonEnvironmentBaseEntity } from 'src/infrastructure/database/base_entiy';
 import { Country } from 'src/modules/country-and-states/entity/country.entity';
 import {
   Column,
@@ -11,12 +11,15 @@ import {
 
 @Entity('businesses')
 @Index(['businessIdentifier'], { unique: true })
-export class Businesses extends BaseEntity {
+export class Businesses extends NonEnvironmentBaseEntity {
   @PrimaryGeneratedColumn('uuid')
   businessId: string;
 
   @Column('varchar')
   businessIdentifier: string;
+
+  @Column({ type: 'varchar' })
+  environment: string;
 
   @Column('varchar')
   businessName: string;

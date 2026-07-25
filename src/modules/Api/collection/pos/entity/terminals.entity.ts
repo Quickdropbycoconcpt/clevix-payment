@@ -7,9 +7,6 @@ export class Terminal extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   terminalId: string;
 
-  @Column({ type: 'uuid' })
-  businessId: string;
-
   @Index({ unique: true })
   @Column({ type: 'varchar' })
   serialNumber: string;

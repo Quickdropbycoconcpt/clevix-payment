@@ -64,7 +64,7 @@ export class WebhookService {
         businessId: scope.businessId,
         environment: scope.environment,
         type,
-        deleteAt: IsNull(),
+        deletedAt: IsNull(),
       },
     });
 
@@ -96,7 +96,7 @@ export class WebhookService {
       .andWhere('webhook.environment = :environment', {
         environment: scope.environment,
       })
-      .andWhere('webhook.deleteAt IS NULL')
+      .andWhere('webhook.deletedAt IS NULL')
       .orderBy('webhook.createdAt', 'DESC');
 
     if (input.type) {
@@ -117,7 +117,7 @@ export class WebhookService {
     const webhook = await this.findScopedWebhook(webhookId, scope);
 
     this.webhookRepo.merge(webhook, {
-      deleteAt: new Date(),
+      deletedAt: new Date(),
     });
 
     return this.webhookRepo.save(webhook);
@@ -309,7 +309,7 @@ export class WebhookService {
         businessId: input.businessId,
         environment: input.environment,
         type,
-        deleteAt: IsNull(),
+        deletedAt: IsNull(),
       },
     });
 
@@ -379,7 +379,7 @@ export class WebhookService {
         webhookId,
         businessId: scope.businessId,
         environment: scope.environment,
-        deleteAt: IsNull(),
+        deletedAt: IsNull(),
       },
     });
 

@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsInt,
   IsNotEmpty,
+  IsNumberString,
   IsOptional,
   IsString,
   Matches,
@@ -48,4 +49,12 @@ export class CreateDynamicVirtualAccountDto {
   @Min(1)
   @Max(1440)
   validityTime: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Fee already computed and included in `amount` upstream (e.g. a customer-borne checkout fee). When set, the wallet credit uses this instead of recomputing a fee off `amount` once the account is funded.',
+  })
+  @IsOptional()
+  @IsNumberString()
+  feeCharged?: string;
 }

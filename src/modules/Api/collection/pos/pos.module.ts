@@ -21,5 +21,6 @@ import { PosTerminalService } from './service/pos_terminal.service';
   ],
   controllers: [PosController],
   providers: [CollectionAdapterFactory, PosService, PosTerminalService],
+  exports: [PosService],
 })
 export class PosModule {}

@@ -26,9 +26,6 @@ export class StaticWalletAccounts extends BaseEntity {
   @Column()
   provider: string;
 
-  @Column({ type: 'uuid' })
-  businessId: string;
-
   @Column({ type: 'varchar', nullable: true })
   address: string;
 

@@ -13,9 +13,6 @@ export class Transactions extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   transactionId: string;
 
-  @Column({ type: 'uuid' })
-  businessId: string;
-
   @Column({ type: 'bigint' })
   expectedAmount: string;
 

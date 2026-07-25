@@ -1,4 +1,4 @@
-import { BaseEntity } from 'src/infrastructure/database/base_entiy';
+import { OwnerlessBaseEntity } from 'src/infrastructure/database/base_entiy';
 import {
   Column,
   Entity,
@@ -13,7 +13,7 @@ import { LedgerEntryDirection } from 'src/shared/enum';
 
 @Entity('ledger_entries')
 @Index(['ledgerTransactionId', 'ledgerAccountId', 'direction'])
-export class LedgerEntry extends BaseEntity {
+export class LedgerEntry extends OwnerlessBaseEntity {
   @PrimaryGeneratedColumn('uuid')
   ledgerEntryId: string;
 
