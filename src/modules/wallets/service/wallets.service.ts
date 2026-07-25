@@ -274,20 +274,28 @@ export class WalletService {
             /**
              * No allocations at all means nothing claimed this reference —
              * one implicit bucket for the whole credit, routed by general
-             * config alone. Uses `totalAmount` (gross), not `netAmount`,
-             * since the fee gets subtracted per-allocation below.
+             * config alone. When the business bears the fee, this needs to
+             * be `totalAmount` (gross) since allocateSettlementShares
+             * subtracts the fee below; when the customer already covered
+             * it, there's nothing left to subtract, so it needs to already
+             * be `netAmount` — otherwise the bucket would include the fee
+             * on top of what the business is actually owed.
              */
             const effectiveAllocations = allocations?.length
               ? allocations
               : [
                   {
                     settlementBankAccountId: null,
-                    grossAmount: totalAmount.toString(),
+                    grossAmount: (input.feeCharged
+                      ? netAmount
+                      : totalAmount
+                    ).toString(),
                   },
                 ];
 
             const shares = allocateSettlementShares(
               effectiveAllocations,
+              Boolean(input.feeCharged),
               merchantFee,
             );
 

@@ -167,6 +167,7 @@ export type SettlementShare = {
  */
 export function allocateSettlementShares(
   allocations: SettlementSharingAllocation[],
+  feeCharged: boolean,
   merchantFee: bigint,
 ): SettlementShare[] {
   const totalGrossAmount = allocations.reduce(
@@ -178,6 +179,19 @@ export function allocateSettlementShares(
     throw new BadRequestException(
       'Settlement allocations have no gross amount to prorate against',
     );
+  }
+
+  /**
+   * The customer already covered the fee (it's baked into what they paid,
+   * on top of the base amount) — the business is owed its actual, full
+   * gross amount per allocation, nothing to subtract. No fee math needed
+   * at all in this case.
+   */
+  if (feeCharged) {
+    return allocations.map((allocation) => ({
+      settlementBankAccountId: allocation.settlementBankAccountId,
+      amount: BigInt(allocation.grossAmount),
+    }));
   }
 
   const feeShares = allocations.map((allocation) => {
@@ -192,14 +206,15 @@ export function allocateSettlementShares(
     };
   });
 
-  const flooredFeeTotal = feeShares.reduce(
-    (sum, entry) => sum + entry.fee,
-    0n,
-  );
+  const flooredFeeTotal = feeShares.reduce((sum, entry) => sum + entry.fee, 0n);
   let feeLeftover = merchantFee - flooredFeeTotal;
 
   const byFeeRemainderDesc = [...feeShares].sort((a, b) =>
-    b.feeRemainder > a.feeRemainder ? 1 : b.feeRemainder < a.feeRemainder ? -1 : 0,
+    b.feeRemainder > a.feeRemainder
+      ? 1
+      : b.feeRemainder < a.feeRemainder
+        ? -1
+        : 0,
   );
 
   for (let i = 0; i < byFeeRemainderDesc.length && feeLeftover > 0n; i++) {
