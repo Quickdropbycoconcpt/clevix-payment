@@ -87,7 +87,10 @@ export class ServiceCheckout {
   private async attachMandatoryFields(service: OrganizationService) {
     const mandatoryFields = await this.getMandatoryFields(service.environment);
 
-    service.customForms = [...mandatoryFields, ...(service.customForms ?? [])];
+    service.customForms = [
+      ...mandatoryFields,
+      ...(service.customForms ?? []),
+    ].sort((a, b) => Number(a.sequenceNo) - Number(b.sequenceNo));
 
     return service;
   }

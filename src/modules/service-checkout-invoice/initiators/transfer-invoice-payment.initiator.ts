@@ -48,7 +48,7 @@ export class TransferInvoicePaymentInitiator implements InvoicePaymentInitiator 
         accountName: business?.businessName ?? invoice.reference,
         amount: feePreview.totalAmount,
         reference: attempt.invoicePaymentTransactionId,
-        validityTime: this.resolveValidityMinutes(invoice.expiresAt),
+        validityTime: 2400,
         // Only override the eventual wallet-credit fee computation when the
         // fee was already baked into `amount` (customer-borne). When the
         // business bears it, let creditUserWallet compute/deduct it as usual.
@@ -56,21 +56,6 @@ export class TransferInvoicePaymentInitiator implements InvoicePaymentInitiator 
           feePreview.feeBearer === 'customer' ? feePreview.fee : undefined,
       },
       { businessId: invoice.businessId, environment: invoice.environment },
-    );
-  }
-
-  private resolveValidityMinutes(expiresAt: Date | null): number {
-    if (!expiresAt) {
-      return VIRTUAL_ACCOUNT_DEFAULT_VALIDITY_MINUTES;
-    }
-
-    const minutesRemaining = Math.floor(
-      (expiresAt.getTime() - Date.now()) / 60000,
-    );
-
-    return Math.min(
-      VIRTUAL_ACCOUNT_MAX_VALIDITY_MINUTES,
-      Math.max(VIRTUAL_ACCOUNT_MIN_VALIDITY_MINUTES, minutesRemaining),
     );
   }
 }
