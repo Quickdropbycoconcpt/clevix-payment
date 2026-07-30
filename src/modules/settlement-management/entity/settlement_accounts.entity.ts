@@ -6,6 +6,9 @@ export class SettlementBankAccounts extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   bankAccountId: string;
 
+  @Column({ type: 'boolean', default: false })
+  isPrimary: boolean;
+
   @Column({ type: 'varchar' })
   accountNumber: string;
 

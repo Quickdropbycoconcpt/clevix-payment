@@ -71,6 +71,12 @@ export class SettlementService {
     return { removed: true };
   }
 
+  async getPrimaryAccount(businessId: string, environment: string) {
+    return this.settlementAccountRepo.findOne({
+      where: { businessId, environment, isPrimary: true },
+    });
+  }
+
   async getSettlementAccounts(scope: RequestScope, name?: string) {
     const { businessId, environment } = getBusinessScope(scope);
 

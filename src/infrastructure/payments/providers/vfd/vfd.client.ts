@@ -28,6 +28,12 @@ import {
   tripleDESDecrypt,
   buildPosDataCode,
 } from 'src/shared/encryption';
+import {
+  CardInitiationResponse,
+  CardInput,
+  CardOtpInput,
+  CardOtpResponse,
+} from 'src/modules/Api/collection/card/interface/card.interface';
 
 type VfdCreateVirtualAccountResponse = {
   accountNumber: string;
@@ -281,6 +287,7 @@ export class VfdClient {
     consumerSecret: string;
     pos_auth_username: string;
     pos_auth_password: string;
+    card_url: string;
   } {
     const url =
       environment == RequestEnvironment.TEST
@@ -291,6 +298,11 @@ export class VfdClient {
       environment == RequestEnvironment.TEST
         ? process.env.VFD_LUX_DEV_BASE_URL
         : process.env.VFD_LUX_LIVE_BASE_URL;
+
+    const card_url =
+      environment == RequestEnvironment.TEST
+        ? process.env.VFD_CARD_DEV_BASE_URL
+        : process.env.VFD_CARD_LIVE_BASE_URL;
 
     const kycUrl =
       environment == RequestEnvironment.TEST
@@ -331,6 +343,7 @@ export class VfdClient {
       kycUrl,
       pos_auth_password,
       pos_auth_username,
+      card_url,
     };
   }
 
@@ -362,6 +375,83 @@ export class VfdClient {
       throw new BadRequestException(
         'Unable to generate payment account',
         error,
+      );
+    }
+  }
+
+  async initiateCardTransaction(
+    body: CardInput,
+  ): Promise<CardInitiationResponse> {
+    try {
+      const totalAmount = MoneyValueConverter.fromKoboToNaira(body.amount);
+      const credentials = this.credentialPicker(body.environment);
+
+      const response = await this.withTokenRetry(body.environment, (token) =>
+        firstValueFrom(
+          this.httpService.post(
+            `${credentials.card_url}/initiate/payment`,
+            {
+              amount: totalAmount,
+              reference: `${body.reference}`,
+              useExistingCard: false,
+              cardNumber: body.cardNumber,
+              cardPin: body.pin,
+              cvv2: body.cvv2,
+              expiryDate: body.expiryDate,
+              narration: 'Payment for electronics',
+              customerId: 'test@gmail.com',
+            },
+            axiosConfig(body.environment, token),
+          ),
+        ),
+      );
+
+      const responseData = response.data;
+      const cardData = responseData?.data ?? {};
+      const code = cardData?.code;
+
+      return {
+        success: responseData?.success ?? false,
+        code,
+        message: responseData?.message ?? cardData?.narration,
+        redirectUrl: code === '02' ? cardData?.redirectHtml : undefined,
+        requiredOtp: code === '01',
+      };
+    } catch (error) {
+      console.log(error?.response?.data);
+      throw new BadRequestException('Unable to initiate payment');
+    }
+  }
+
+  async validateCardotp(body: CardOtpInput): Promise<CardOtpResponse> {
+    try {
+      const credentials = this.credentialPicker(body.environment);
+
+      const response = await this.withTokenRetry(body.environment, (token) =>
+        firstValueFrom(
+          this.httpService.post(
+            `${credentials.card_url}/validate-otp`,
+            {
+              otp: body.otp?.trim(),
+              reference: `Clevix-${body.reference}`,
+            },
+            axiosConfig(body.environment, token),
+          ),
+        ),
+      );
+
+      const responseData = response.data;
+      const cardData = responseData?.data ?? {};
+
+      return {
+        success: responseData?.success ?? false,
+        code: cardData?.code,
+        message: responseData?.message ?? cardData?.narration,
+      };
+    } catch (error) {
+      console.log(error?.response?.data);
+      throw new BadRequestException(
+        error?.response?.data?.message ?? 'Unable to validate payment OTP',
       );
     }
   }

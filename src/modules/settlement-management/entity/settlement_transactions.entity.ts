@@ -26,6 +26,9 @@ export class SettlementTransactions extends BaseEntity {
   @Column({ type: 'bigint' })
   expectedSettledAmount: string;
 
+  @Column({ type: 'date' })
+  settlementDate: string;
+
   @Column({ enum: BusinessSettlementType, type: 'enum' })
   settlementType: BusinessSettlementType;
 

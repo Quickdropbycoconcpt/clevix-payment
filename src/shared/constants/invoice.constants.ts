@@ -22,4 +22,5 @@ export const FEE_SOURCE_BY_METHOD: Record<
 > = {
   [SupportedPaymentMethod.POS]: TransactionSource.POS_COLLECTION,
   [SupportedPaymentMethod.TRANSFER]: TransactionSource.VIRTUAL_ACCOUNT_COLLECTION,
+  [SupportedPaymentMethod.CARD]: TransactionSource.DEBIT_CARD_COLLECTION,
 };

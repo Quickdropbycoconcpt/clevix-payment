@@ -15,10 +15,11 @@ import { TransferModule } from './modules/Api/transfers/transfer.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { WebhookModule } from './modules/webhooks/webhook.module';
 import { TransactionModule } from './modules/transactions/transactions.module';
-import { KycModule } from './modules/kyc/kyc.module';
+import { KycModule } from './modules/Api/kyc/kyc.module';
 import { ServiceCheckoutModule } from './modules/service-checkout/service-checkout.module';
 import { ServiceCheckoutInvoiceModule } from './modules/service-checkout-invoice/service-checkout-invoice.module';
 import { SettlementManagementModule } from './modules/settlement-management/settlement-management.module';
+import { CardPaymentModule } from './modules/Api/collection/card/card-payment-module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { SettlementManagementModule } from './modules/settlement-management/sett
     ServiceCheckoutModule,
     ServiceCheckoutInvoiceModule,
     SettlementManagementModule,
+    CardPaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

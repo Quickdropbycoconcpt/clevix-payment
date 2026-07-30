@@ -12,6 +12,7 @@ import { TransactionStatus } from 'src/shared/enum';
 export enum SupportedPaymentMethod {
   POS = 'POS',
   TRANSFER = 'TRANSFER',
+  CARD = 'CARD',
 }
 
 @Entity('invoice_payment_transactions')

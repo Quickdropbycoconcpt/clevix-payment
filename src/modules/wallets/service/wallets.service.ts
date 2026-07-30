@@ -35,6 +35,7 @@ import { TRANSACTION_SOURCE_TO_PAYMENT_SOURCE } from 'src/shared/constants/settl
 import { SettlementAccountResolutionService } from 'src/modules/settlement-management/service/settlement-account-resolution.service';
 import { allocateSettlementShares } from 'src/shared/utils';
 import { SettlementTransactionsService } from 'src/modules/settlement-management/service/settlement-transactions.service';
+import { SettlementService } from 'src/modules/settlement-management/service/settlement.account.service';
 
 @Injectable()
 export class WalletService {
@@ -51,6 +52,7 @@ export class WalletService {
     private readonly settlementConfigService: BusinessSettlementConfigurationService,
     private readonly settlementAccountResolutionService: SettlementAccountResolutionService,
     private readonly settlementTransactionsService: SettlementTransactionsService,
+    private readonly settlementService: SettlementService,
   ) {}
 
   async creditUserWallet(input: CreditWallet) {
@@ -304,17 +306,26 @@ export class WalletService {
                 continue;
               }
 
+              let resolvedAccountId = settlementBankAccountId;
+
               if (
-                !settlementBankAccountId &&
+                !resolvedAccountId &&
                 settlementConfig?.settlementLocation === SettlementLocation.BANK
               ) {
-                // TODO: general (non-override) BANK settlement still needs
-                // a way to resolve *which* SettlementBankAccounts row a
-                // business's default config should pay out to — this
-                // config only says WALLET vs BANK, not a specific account.
-                throw new BadRequestException(
-                  'Business settlement configuration resolves to BANK but has no settlement account to route to',
-                );
+                /**
+                 * No primary account configured yet doesn't block the
+                 * credit — the bucket still accumulates with a null
+                 * account and just sits unsettled until the business adds
+                 * one. Nothing to route to right now isn't the same as
+                 * nothing to track.
+                 */
+                const primaryAccount =
+                  await this.settlementService.getPrimaryAccount(
+                    businessId,
+                    environment,
+                  );
+
+                resolvedAccountId = primaryAccount?.bankAccountId ?? null;
               }
 
               await this.settlementTransactionsService.upsertUnsettledBucket(
@@ -323,7 +334,7 @@ export class WalletService {
                   environment,
                   paymentSource,
                   settlementType,
-                  settlementBankAccountId,
+                  settlementBankAccountId: resolvedAccountId,
                   amount,
                 },
                 entityManager,

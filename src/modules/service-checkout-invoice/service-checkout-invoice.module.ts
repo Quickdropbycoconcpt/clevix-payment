@@ -7,10 +7,12 @@ import { OrganisationInvoiceService } from './service/org_invoice.service';
 import { ServiceCheckoutModule } from '../service-checkout/service-checkout.module';
 import { ServiceInvoiceCheckoutController } from './controller/service-invoice-checkout.controller';
 import { PosModule } from '../Api/collection/pos/pos.module';
+import { CardPaymentModule } from '../Api/collection/card/card-payment-module';
 import { VirtualAccountsModule } from '../Api/collection/virtual-accounts/virtual-accounts.module';
 import { Businesses } from '../businesses/entity/business.entity';
 import { InvoicePaymentInitiatorFactory } from './initiators/invoice-payment-initiator.factory';
 import { PosInvoicePaymentInitiator } from './initiators/pos-invoice-payment.initiator';
+import { CardInvoicePaymentInitiator } from './initiators/card-invoice-payment.initiator';
 import { TransferInvoicePaymentInitiator } from './initiators/transfer-invoice-payment.initiator';
 import { ReconciliationModule } from 'src/modules/reconciliation/reconciliation.module';
 import { InvoiceReconciliationHandler } from './reconciliation/invoice-reconciliation.handler';
@@ -29,6 +31,7 @@ import { SettlementManagementModule } from '../settlement-management/settlement-
     ]),
     ServiceCheckoutModule,
     PosModule,
+    CardPaymentModule,
     VirtualAccountsModule,
     ReconciliationModule,
     FeesModule,
@@ -39,6 +42,7 @@ import { SettlementManagementModule } from '../settlement-management/settlement-
     OrganisationInvoiceService,
     InvoicePaymentInitiatorFactory,
     PosInvoicePaymentInitiator,
+    CardInvoicePaymentInitiator,
     TransferInvoicePaymentInitiator,
     InvoiceFeeService,
     InvoiceReconciliationHandler,

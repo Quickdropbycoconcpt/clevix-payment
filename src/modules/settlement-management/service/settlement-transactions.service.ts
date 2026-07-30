@@ -32,6 +32,8 @@ export class SettlementTransactionsService {
       entityManager?.getRepository(SettlementTransactions) ??
       this.settlementTxnRepo;
 
+    const settlementDate = new Date().toISOString().slice(0, 10);
+
     const existing = await repo.findOne({
       where: {
         businessId: input.businessId,
@@ -40,7 +42,9 @@ export class SettlementTransactionsService {
         settlementType: input.settlementType,
         settlementbankAccountId: input.settlementBankAccountId ?? IsNull(),
         status: SettlementTransactionStatus.UNSETTLED,
+        settlementDate,
       },
+      lock: { mode: 'pessimistic_write' },
     });
 
     if (existing) {
@@ -58,6 +62,7 @@ export class SettlementTransactionsService {
       settlementType: input.settlementType,
       settlementbankAccountId: input.settlementBankAccountId,
       expectedSettledAmount: input.amount.toString(),
+      settlementDate,
     });
 
     return repo.save(bucket);

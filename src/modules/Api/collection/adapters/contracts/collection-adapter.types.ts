@@ -5,5 +5,6 @@ export enum CollectionProvider {
 
 export enum CollectionSource {
   VIRTUAL_ACCOUNT = 'virtual_account',
+  CARD = 'card',
   POS = 'pos',
 }

@@ -25,6 +25,7 @@ import { SettlementAccountResolutionService } from './service/settlement-account
     SettlementAccountResolutionService,
   ],
   exports: [
+    SettlementService,
     BusinessSettlementConfigurationService,
     SettlementTransactionsService,
     SettlementAccountResolutionService,

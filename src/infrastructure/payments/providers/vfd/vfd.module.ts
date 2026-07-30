@@ -3,14 +3,22 @@ import { VfdPosProvider } from './vfd-adapter/vfd-pos-adapter';
 import { VfdVirtualAccountProvider } from './vfd-adapter/vfd-virtual-account-adapter';
 import { VfdClient } from './vfd.client';
 import { VfdTransferProvider } from './vfd-adapter/vfd-transfer-adapter';
+import { VfdCardProvider } from './vfd-adapter/vfd-card-payment.adapter';
 
 @Module({
   providers: [
     VfdVirtualAccountProvider,
     VfdPosProvider,
     VfdTransferProvider,
+    VfdCardProvider,
     VfdClient,
   ],
-  exports: [VfdVirtualAccountProvider, VfdPosProvider, VfdTransferProvider],
+  exports: [
+    VfdVirtualAccountProvider,
+    VfdPosProvider,
+    VfdTransferProvider,
+    VfdCardProvider,
+    VfdClient,
+  ],
 })
 export class VfdModule {}
