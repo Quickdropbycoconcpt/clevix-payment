@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -46,6 +46,7 @@ type VfdCreateVirtualAccountResponse = {
 export class VfdClient {
   constructor(private readonly httpService: HttpService) {}
   private readonly serviceName = VfdClient.name;
+  private readonly logger = new Logger(VfdClient.name);
   private readonly AUTH_CACHE_KEY = 'vfd_access_token';
   private readonly redis = new RedisConfig();
 
@@ -385,7 +386,8 @@ export class VfdClient {
     try {
       const totalAmount = MoneyValueConverter.fromKoboToNaira(body.amount);
       const credentials = this.credentialPicker(body.environment);
-
+      await this.logVfdCardEgressIp(body.environment, credentials.card_url);
+      // return;
       const response = await this.withTokenRetry(body.environment, (token) =>
         firstValueFrom(
           this.httpService.post(
@@ -399,7 +401,7 @@ export class VfdClient {
               cvv2: body.cvv2,
               expiryDate: body.expiryDate,
               narration: 'Payment for electronics',
-              customerId: 'test@gmail.com',
+              customerId: body.email,
             },
             axiosConfig(body.environment, token),
           ),
@@ -409,17 +411,60 @@ export class VfdClient {
       const responseData = response.data;
       const cardData = responseData?.data ?? {};
       const code = cardData?.code;
-
+      console.log(response);
       return {
         success: responseData?.success ?? false,
         code,
+        reference: body.reference,
         message: responseData?.message ?? cardData?.narration,
-        redirectUrl: code === '02' ? cardData?.redirectHtml : undefined,
-        requiredOtp: code === '01',
+        redirectUrl: code !== '01' ? cardData?.redirectHtml : undefined,
+        requiredOtp: code == '01',
       };
     } catch (error) {
+      console.log(error);
       console.log(error?.response?.data);
       throw new BadRequestException('Unable to initiate payment');
+    }
+  }
+
+  private async logVfdCardEgressIp(environment: string, cardUrl: string) {
+    const ipCheckConfig = axiosConfig(environment, '');
+    delete ipCheckConfig.headers;
+
+    try {
+      const response = await firstValueFrom(
+        this.httpService.get<{ ip?: string }>(
+          'https://api.ipify.org?format=json',
+          ipCheckConfig,
+        ),
+      );
+      const cardHost = new URL(cardUrl).host;
+      const proxyHost = this.getProxyHost(environment);
+
+      this.logger.log(
+        `VFD card request egress IP: ${response.data?.ip ?? 'unknown'}; targetHost=${cardHost}; proxyHost=${proxyHost ?? 'none'}`,
+      );
+    } catch (error: any) {
+      this.logger.warn(
+        `Unable to resolve VFD card request egress IP: ${error?.message ?? 'unknown error'}`,
+      );
+    }
+  }
+
+  private getProxyHost(environment: string): string | undefined {
+    if (environment !== RequestEnvironment.LIVE) {
+      return undefined;
+    }
+
+    const proxyUrl = process.env.QUOTAGUARDSTATIC_URL;
+    if (!proxyUrl) {
+      return 'not configured';
+    }
+
+    try {
+      return new URL(proxyUrl).host;
+    } catch {
+      return 'invalid QUOTAGUARDSTATIC_URL';
     }
   }
 
@@ -433,7 +478,7 @@ export class VfdClient {
             `${credentials.card_url}/validate-otp`,
             {
               otp: body.otp?.trim(),
-              reference: `Clevix-${body.reference}`,
+              reference: `${body.reference}`,
             },
             axiosConfig(body.environment, token),
           ),
@@ -449,7 +494,7 @@ export class VfdClient {
         message: responseData?.message ?? cardData?.narration,
       };
     } catch (error) {
-      console.log(error?.response?.data);
+      console.log(error?.response);
       throw new BadRequestException(
         error?.response?.data?.message ?? 'Unable to validate payment OTP',
       );
@@ -584,7 +629,7 @@ export class VfdClient {
             consumerKey,
             validityTime: '-1',
           },
-          axiosConfig(environment, ''),
+          // axiosConfig(environment, ''),
         ),
       );
 
@@ -597,7 +642,7 @@ export class VfdClient {
         return response?.data?.data?.access_token as string;
       }
     } catch (error: any) {
-      console.log(error.message);
+      console.log(error.response.data);
       throw new BadRequestException(error.message);
     }
   }

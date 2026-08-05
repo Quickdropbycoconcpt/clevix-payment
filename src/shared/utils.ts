@@ -123,7 +123,9 @@ export function axiosConfig(
   };
 
   if (merchantEnvironment === RequestEnvironment.LIVE) {
-    axiosConfig.httpsAgent = httpsAgent;
+    // axiosConfig.httpsAgent = httpsAgent;
+
+    return axiosConfig;
   }
 
   return axiosConfig;

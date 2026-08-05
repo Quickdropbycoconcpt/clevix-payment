@@ -5,6 +5,8 @@ export class CardInput {
 
   pin: string;
 
+  email: string;
+
   cardNumber: string;
 
   cvv2: string;
@@ -28,6 +30,8 @@ export class CardInitiationResponse {
   success: boolean;
 
   code: string;
+
+  reference: string;
 
   message: string;
 

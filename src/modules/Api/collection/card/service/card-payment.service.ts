@@ -89,6 +89,7 @@ export class CardPaymentService {
       pin: input.cardPin,
       cvv2: input.cvv2,
       cardNumber: input.cardNumber,
+      email: 'quickdropbycoconcept@gmail.com',
       expiryDate: input.expiryDate,
       amount: input.amount,
       reference: ourRef,
