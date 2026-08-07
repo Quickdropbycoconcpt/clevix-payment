@@ -20,6 +20,7 @@ import { ServiceCheckoutModule } from './modules/service-checkout/service-checko
 import { ServiceCheckoutInvoiceModule } from './modules/service-checkout-invoice/service-checkout-invoice.module';
 import { SettlementManagementModule } from './modules/settlement-management/settlement-management.module';
 import { CardPaymentModule } from './modules/Api/collection/card/card-payment-module';
+import { BanksModule } from './modules/Api/banks/banks.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { CardPaymentModule } from './modules/Api/collection/card/card-payment-mo
     ServiceCheckoutInvoiceModule,
     SettlementManagementModule,
     CardPaymentModule,
+    BanksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

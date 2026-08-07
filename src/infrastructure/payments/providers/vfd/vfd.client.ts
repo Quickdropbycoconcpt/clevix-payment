@@ -647,6 +647,22 @@ export class VfdClient {
     }
   }
 
+  async vfdBankList() {
+    try {
+      const credentials = this.credentialPicker('LIVE');
+      const response = await this.withTokenRetry('LIVE', (token) =>
+        firstValueFrom(
+          this.httpService.get(`${credentials.walletUrl}/bank`, {
+            headers: { AccessToken: token },
+          }),
+        ),
+      );
+      return response.data.data.bank;
+    } catch (error) {
+      throw new BadRequestException(error.message, error);
+    }
+  }
+
   async vfdTransfer(body: TransferQueJobData) {
     const response = await this.vfdsenderaccountEnquiry(
       body.environment,

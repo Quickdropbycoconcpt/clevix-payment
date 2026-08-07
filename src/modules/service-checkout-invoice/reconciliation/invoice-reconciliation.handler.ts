@@ -50,9 +50,7 @@ export class InvoiceReconciliationHandler
     if (transaction.executionStatus === TransactionStatus.SUCCESS) {
       attempt.invoice.status = InvoiceStatus.PAID;
       attempt.invoice.paidAt = new Date();
-
       await this.invoiceRepo.save(attempt.invoice);
-
       await this.webhookService.dispatchWebhook({
         businessId: attempt.invoice.businessId,
         environment: attempt.invoice.environment,

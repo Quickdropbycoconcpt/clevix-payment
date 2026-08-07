@@ -4,6 +4,7 @@ import { VfdVirtualAccountProvider } from './vfd-adapter/vfd-virtual-account-ada
 import { VfdClient } from './vfd.client';
 import { VfdTransferProvider } from './vfd-adapter/vfd-transfer-adapter';
 import { VfdCardProvider } from './vfd-adapter/vfd-card-payment.adapter';
+import { VfdBanksManagementAdapter } from './vfd-adapter/vfd-banks-adapter';
 
 @Module({
   providers: [
@@ -11,6 +12,7 @@ import { VfdCardProvider } from './vfd-adapter/vfd-card-payment.adapter';
     VfdPosProvider,
     VfdTransferProvider,
     VfdCardProvider,
+    VfdBanksManagementAdapter,
     VfdClient,
   ],
   exports: [
@@ -18,6 +20,7 @@ import { VfdCardProvider } from './vfd-adapter/vfd-card-payment.adapter';
     VfdPosProvider,
     VfdTransferProvider,
     VfdCardProvider,
+    VfdBanksManagementAdapter,
     VfdClient,
   ],
 })

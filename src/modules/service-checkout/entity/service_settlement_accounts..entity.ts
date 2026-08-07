@@ -1,4 +1,5 @@
 export class ServiceItemSettlementAccount {
+  
   bankName: string;
 
   bankCode: string;

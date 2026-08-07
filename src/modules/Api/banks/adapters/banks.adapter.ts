@@ -1,5 +1,13 @@
-export type BankDefinition = {};
+export type BankDefinition = {
+  name: string;
+  bankCode: string;
+};
 export type AccountValidationResult = {};
+
+export enum BankProvider {
+  VFD = 'vfd',
+}
+
 export interface BankDirectoryAdapter {
   /** Retrieves the list of supported commercial banks and their routing codes */
   getBanks(): Promise<BankDefinition[]>;
