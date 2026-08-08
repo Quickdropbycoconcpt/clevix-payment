@@ -5,9 +5,11 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { State } from './state.entity';
+import { Businesses } from 'src/modules/businesses/entity/business.entity';
 
 @Entity('local_governments')
 @Index(['stateId', 'name'], { unique: true })
@@ -29,4 +31,7 @@ export class LocalGovernment extends NonEnvironmentBaseEntity {
   })
   @JoinColumn({ name: 'stateId', referencedColumnName: 'stateId' })
   state: State;
+
+  @OneToMany(() => Businesses, (biz) => biz.lga)
+  businesses: Businesses[];
 }

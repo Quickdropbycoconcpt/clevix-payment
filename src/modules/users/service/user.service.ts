@@ -91,9 +91,17 @@ export class UserService {
         },
         entityManager,
       );
+      await entityManager.update(
+        User,
+        { userId: savedUser.userId },
+        { activeBusinessId: savedBusiness.businessId },
+      );
       const { password, ...account } = savedUser;
 
-      return account;
+      return {
+        ...account,
+        activeBusinessId: savedBusiness.businessId,
+      };
     });
   }
 
@@ -108,14 +116,15 @@ export class UserService {
 
     const activeBusinessMemberships =
       await this.businessMemberService.findActiveMembershipsByUser(user.userId);
-    const activeBusiness =
-      activeBusinessMemberships.length === 1
-        ? activeBusinessMemberships[0].business
-        : null;
-    const roleId =
-      activeBusinessMemberships.length === 1
-        ? activeBusinessMemberships[0].roleId
-        : null;
+    const activeBusinessMembership =
+      activeBusinessMemberships.find(
+        (membership) => membership.businessId === user.activeBusinessId,
+      ) ??
+      (activeBusinessMemberships.length === 1
+        ? activeBusinessMemberships[0]
+        : null);
+    const activeBusiness = activeBusinessMembership?.business ?? null;
+    const roleId = activeBusinessMembership?.roleId ?? null;
     const allowedPermissions =
       await this.businessRolesService.getUserPermissionInBusiness(roleId ?? '');
     return {
@@ -123,7 +132,29 @@ export class UserService {
       activeBusiness,
       allowedPermissions,
       activeBusinessMemberships,
-      environment: activeBusiness?.environment ?? 'TEST' ,
+      environment: activeBusiness?.environment ?? 'TEST',
     };
+  }
+
+  async getActiveBusinessId(userId: string): Promise<string | null> {
+    const user = await this.userRepo.findOne({
+      where: { userId },
+      select: {
+        userId: true,
+        activeBusinessId: true,
+      },
+    });
+
+    return user?.activeBusinessId ?? null;
+  }
+
+  async switchEnvironment(businessId: string) {
+    try {
+      const businesses =
+        await this.businessService.environmentSwitching(businessId);
+      return businesses;
+    } catch (error) {
+      throw new BadRequestException('Something went wrong');
+    }
   }
 }

@@ -3,6 +3,7 @@ import { ObjectLiteral, SelectQueryBuilder } from 'typeorm';
 
 export type RequestScope = {
   businessId?: string | null;
+  userId?: string;
   environment?: string | null;
 };
 

@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Country } from './country.entity';
 import { LocalGovernment } from './local-government.entity';
+import { Businesses } from 'src/modules/businesses/entity/business.entity';
 
 @Entity('states')
 @Index(['countryId', 'name'], { unique: true })
@@ -37,4 +38,9 @@ export class State extends NonEnvironmentBaseEntity {
 
   @OneToMany(() => LocalGovernment, (localGovernment) => localGovernment.state)
   localGovernments: LocalGovernment[];
+
+  @OneToMany(() => Businesses, (business) => business.state, {
+    onDelete: 'CASCADE',
+  })
+  businesses: Businesses[];
 }

@@ -20,23 +20,25 @@ export class BusinessContextGuard implements CanActivate {
       throw new UnauthorizedException('Pease login to continue');
     }
 
-    if (!user.businessId) {
-      throw new ForbiddenException('You need to setup a buiness');
-    }
-
     const membership =
-      await this.businessMemberService.findActiveBusinessMembership(
+      await this.businessMemberService.findActiveBusinessMembershipForUser(
         user.userId,
-        user.businessId,
       );
 
     if (!membership) {
-      throw new ForbiddenException(
-        'You are currenty not an active member of this business',
-      );
+      throw new ForbiddenException('Please select an active business');
     }
 
     request.businessMembership = membership;
+    request.user = {
+      ...user,
+      businessId: membership.businessId,
+      environment: membership.business.environment,
+      permissions:
+        membership.role.permissions?.map(
+          (rolePermission) => rolePermission.permission.key,
+        ) ?? [],
+    };
 
     return true;
   }

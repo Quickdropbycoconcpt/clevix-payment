@@ -80,14 +80,13 @@ export class AuthService {
 
     const token = await this.dashBoardAccessToken({
       userId: account?.user.userId,
-      permissions: account.allowedPermissions.map((e) => e.permission.key),
-      businessId: account?.activeBusiness?.businessId,
-      environment: account.environment,
     });
 
     return {
       ...token,
+      businessId: account?.activeBusiness?.businessId,
       permissions: account.allowedPermissions.map((e) => e.permission.key),
+      environment: account.environment,
     };
   }
 

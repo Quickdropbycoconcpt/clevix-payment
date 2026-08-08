@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { BusinessMember } from '../entity/business-member.entity';
 import { BusinessMemberStatus } from '../enums/business-member.enums';
+import { User } from 'src/modules/users/entity/user.entity';
 import {
   CreateBusinessMemberInput,
   CreateBusinessOwnerInput,
@@ -103,5 +104,23 @@ export class BusinessMembersService {
         },
       },
     });
+  }
+
+  async findActiveBusinessMembershipForUser(
+    userId: string,
+  ): Promise<BusinessMember | null> {
+    return this.businessMemberRepo
+      .createQueryBuilder('membership')
+      .innerJoin(User, 'activeUser', 'activeUser.userId = membership.userId')
+      .leftJoinAndSelect('membership.business', 'business')
+      .leftJoinAndSelect('membership.role', 'role')
+      .leftJoinAndSelect('role.permissions', 'rolePermission')
+      .leftJoinAndSelect('rolePermission.permission', 'permission')
+      .where('membership.userId = :userId', { userId })
+      .andWhere('membership.status = :status', {
+        status: BusinessMemberStatus.ACTIVE,
+      })
+      .andWhere('membership.businessId = activeUser.activeBusinessId')
+      .getOne();
   }
 }

@@ -40,11 +40,11 @@ export class BusinessMember extends NonEnvironmentBaseEntity {
   @JoinColumn({ name: 'businessId' })
   business: Businesses;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User)
   @JoinColumn({ name: 'userId' })
   user: User;
 
-  @ManyToOne(() => BusinessRole, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => BusinessRole)
   @JoinColumn({ name: 'roleId' })
   role: BusinessRole;
 

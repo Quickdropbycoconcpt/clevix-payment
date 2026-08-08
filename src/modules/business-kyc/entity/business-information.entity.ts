@@ -1,9 +1,16 @@
-import { BaseEntity } from 'src/infrastructure/database/base_entiy';
+import { NonEnvironmentBaseEntity } from 'src/infrastructure/database/base_entiy';
+import { Businesses } from 'src/modules/businesses/entity/business.entity';
 import { OrganizationType } from 'src/shared/enum';
-import { Column, Entity, JoinColumn, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  OneToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 
 @Entity('business_information')
-export class BusinessInformation extends BaseEntity {
+export class BusinessInformation extends NonEnvironmentBaseEntity {
   @PrimaryGeneratedColumn('uuid')
   businessInformationId: string;
 
@@ -13,24 +20,22 @@ export class BusinessInformation extends BaseEntity {
   @Column({ type: 'varchar' })
   addressOne: string;
 
+  @Column({ type: 'uuid' })
+  businessId: string;
+
   @Column({ nullable: true })
   addressTwo: string;
 
   @Column({ enum: OrganizationType, type: 'enum' })
   businessType: OrganizationType;
 
-  @Column({ nullable: true, type: 'varchar' })
-  businessPhoneNumber: string;
-
   @Column({ type: 'varchar' })
   businessEmail: string;
 
-  @Column({ type: 'uuid' })
-  stateId: string;
-
-  @Column({ type: 'uuid', nullable: true })
-  lgId: string;
-
   @Column({ type: 'varchar' })
   city: string;
+
+  @OneToOne(() => Businesses, (biz) => biz.info)
+  @JoinColumn({ name: 'businessId' })
+  business: Businesses;
 }

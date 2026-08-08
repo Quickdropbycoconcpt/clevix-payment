@@ -11,7 +11,7 @@ export class User {
   @Column({ type: 'varchar' })
   lastName: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   activeBusinessId: string;
 
   @Column({ type: 'varchar' })

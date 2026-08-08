@@ -1,23 +1,20 @@
-import { BaseEntity } from 'src/infrastructure/database/base_entiy';
-import { Businesses } from 'src/modules/businesses/entity/business.entity';
-import { OrganizationType, VerificationStatus } from 'src/shared/enum';
-import {
-  Column,
-  Entity,
-  OneToOne,
-  JoinColumn,
-  PrimaryGeneratedColumn,
-  CreateDateColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { NonEnvironmentBaseEntity } from 'src/infrastructure/database/base_entiy';
+import { VerificationStatus } from 'src/shared/enum';
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity('business_documents')
-export class BusinessDocuments extends BaseEntity {
+export class BusinessDocuments extends NonEnvironmentBaseEntity {
   @PrimaryGeneratedColumn('uuid')
   businessDocumentId: string;
 
   @Column({ type: 'varchar' })
-  fileUrl: string;
+  file: string;
+
+  @Column({ type: 'uuid' })
+  businessId: string;
+
+  @Column({ type: 'varchar' })
+  documentName: string;
 
   @Column({
     type: 'enum',

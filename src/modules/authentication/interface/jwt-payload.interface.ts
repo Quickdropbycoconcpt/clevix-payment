@@ -6,7 +6,7 @@ export type JwtPayload = {
   businessId?: string;
   userId: string;
   permissions?: string[];
-  environment: string;
+  environment?: string;
 };
 
 export type AuthenticatedRequest = Request & {

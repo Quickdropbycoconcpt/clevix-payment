@@ -1,5 +1,9 @@
+import { Exclude } from 'class-transformer';
 import { NonEnvironmentBaseEntity } from 'src/infrastructure/database/base_entiy';
+import { BusinessInformation } from 'src/modules/business-kyc/entity/business-information.entity';
 import { Country } from 'src/modules/country-and-states/entity/country.entity';
+import { LocalGovernment } from 'src/modules/country-and-states/entity/local-government.entity';
+import { State } from 'src/modules/country-and-states/entity/state.entity';
 import { KycStatus } from 'src/shared/enum';
 import {
   Column,
@@ -7,6 +11,7 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
@@ -49,4 +54,15 @@ export class Businesses extends NonEnvironmentBaseEntity {
   @ManyToOne(() => Country, (country) => country.businesses)
   @JoinColumn({ name: 'countryId' })
   country: Country;
+
+  @ManyToOne(() => State, (state) => state.businesses)
+  @JoinColumn({ name: 'stateId' })
+  state: State;
+
+  @ManyToOne(() => LocalGovernment, (lga) => lga.businesses)
+  @JoinColumn({ name: 'lgId' })
+  lga: LocalGovernment;
+
+  @OneToOne(() => BusinessInformation, (inf) => inf.business)
+  info: BusinessInformation;
 }

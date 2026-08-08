@@ -9,5 +9,5 @@ export interface SetupNewBusiness {
 
   stateId: string;
 
-  lgId: string;
+  lgId?: string;
 }

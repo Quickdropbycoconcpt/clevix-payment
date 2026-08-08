@@ -22,6 +22,7 @@ import { SettlementManagementModule } from './modules/settlement-management/sett
 import { CardPaymentModule } from './modules/Api/collection/card/card-payment-module';
 import { BanksModule } from './modules/Api/banks/banks.module';
 import { DashboardBanksModule } from './modules/banks/banks.module';
+import { BusinessKycModule } from './modules/business-kyc/business-kyc.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { DashboardBanksModule } from './modules/banks/banks.module';
     AuthenticationModule,
     BusinessMembersModule,
     BusinessModule,
+    BusinessKycModule,
     CountryModule,
     PosModule,
     VirtualAccountsModule,
