@@ -14,6 +14,12 @@
           "controllerFileNameSuffix": [".controller.ts", ".controllers.ts"]
         }
       }
+    ],
+    "assets": [
+      {
+        "include": "infrastructure/notification/email/views/**/*.hbs",
+        "watchAssets": true
+      }
     ]
   }
 }

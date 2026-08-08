@@ -21,6 +21,7 @@ import { ServiceCheckoutInvoiceModule } from './modules/service-checkout-invoice
 import { SettlementManagementModule } from './modules/settlement-management/settlement-management.module';
 import { CardPaymentModule } from './modules/Api/collection/card/card-payment-module';
 import { BanksModule } from './modules/Api/banks/banks.module';
+import { DashboardBanksModule } from './modules/banks/banks.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { BanksModule } from './modules/Api/banks/banks.module';
     SettlementManagementModule,
     CardPaymentModule,
     BanksModule,
+    DashboardBanksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

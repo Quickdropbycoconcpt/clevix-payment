@@ -1,5 +1,4 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Country } from 'src/modules/country-and-states/entity/country.entity';
 import { ILike, Repository } from 'typeorm';
@@ -32,7 +31,7 @@ export class BanksService {
     }));
   }
 
-  @Cron(CronExpression.EVERY_10_MINUTES)
+  // @Cron(CronExpression.EVERY_10_MINUTES)
   async syncBanksFromProvider(): Promise<void> {
     const adapter = this.banksAdapterFactory.getBankAdapter(BankProvider.VFD);
     const providerBanks = await adapter.getBanks();

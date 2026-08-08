@@ -1,5 +1,6 @@
 import { NonEnvironmentBaseEntity } from 'src/infrastructure/database/base_entiy';
 import { Country } from 'src/modules/country-and-states/entity/country.entity';
+import { KycStatus } from 'src/shared/enum';
 import {
   Column,
   Entity,
@@ -29,6 +30,9 @@ export class Businesses extends NonEnvironmentBaseEntity {
 
   @Column({ type: 'uuid', nullable: true })
   stateId: string;
+
+  @Column({ type: 'enum', enum: KycStatus, default: KycStatus.PENDING })
+  kycStatus: KycStatus;
 
   @Column({ type: 'boolean', default: false })
   isActive: boolean;
