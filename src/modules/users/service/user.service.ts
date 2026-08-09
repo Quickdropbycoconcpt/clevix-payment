@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { User } from '../entity/user.entity';
@@ -25,6 +26,8 @@ export class UserService {
     private readonly countryService: CountryService,
     private readonly walletService: WalletService,
   ) {}
+
+  private readonly logger = new Logger(UserService.name);
 
   async setupNewAccount(dto: CreateAccountDto) {
     return this.userRepo.manager.transaction(async (entityManager) => {
@@ -154,6 +157,7 @@ export class UserService {
         await this.businessService.environmentSwitching(businessId);
       return businesses;
     } catch (error) {
+      this.logger.error(error);
       throw new BadRequestException('Something went wrong');
     }
   }

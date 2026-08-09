@@ -66,4 +66,16 @@ export class CountryService {
       order: { name: 'ASC' },
     });
   }
+
+  async getLocalGovernmentById(lgId: string): Promise<LocalGovernment> {
+    const localGovernment = await this.localGovernmentRepo.findOne({
+      where: { lgId, isActive: true },
+    });
+
+    if (!localGovernment) {
+      throw new NotFoundException('Local government not found');
+    }
+
+    return localGovernment;
+  }
 }
