@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   GenerateTokenInput,
+  RequestTokenByEmailInput,
   ValidateToken,
 } from '../interface/token.interface';
 import { Repository } from 'typeorm';
@@ -10,7 +11,7 @@ import Crypto from 'node:crypto';
 import { User } from 'src/modules/users/entity/user.entity';
 import { Businesses } from 'src/modules/businesses/entity/business.entity';
 import { EmailService } from 'src/infrastructure/notification/email/email.service';
-import { TokenNotificationType } from 'src/shared/enum';
+import { ActionOwner, TokenNotificationType, TokenType } from 'src/shared/enum';
 import { TOKEN_EMAIL_CONFIG } from 'src/shared/constants/token_email.constants';
 
 @Injectable()
@@ -69,6 +70,10 @@ export class TokenService {
     if (existing) {
       throw new BadRequestException(`Unable to generate token at the moment`);
     }
+    await this.tokenRepo.update(
+      { type: input.type, ownerId: input.ownerId },
+      { usedAt: new Date() },
+    );
     const tokenEntity = this.tokenRepo.create({
       ownerId: input.ownerId,
       ownerType: input.ownerType,
@@ -212,5 +217,35 @@ export class TokenService {
 
   durationInMinutes(date: Date, createdAt: Date): number {
     return Math.round((date.getTime() - createdAt.getTime()) / 60_000);
+  }
+
+  async requestTokenByEmail(input: RequestTokenByEmailInput) {
+    const email = input.email.trim().toLowerCase();
+    const allowedTypes = [
+      TokenType.EMAIL_VERIFICATION,
+      TokenType.PASSWORD_RESET,
+    ];
+
+    if (!allowedTypes.includes(input.type)) {
+      throw new BadRequestException(
+        `Only ${allowedTypes.join(' and ')} are allowed`,
+      );
+    }
+    const user = await this.userRepo.findOne({
+      where: { email: email?.trim() },
+    });
+
+    const rawToken = this.generateNumericToken(6);
+
+    const savedToken = await this.generateToken({
+      token: rawToken,
+      ownerId: user.userId,
+      ownerType: ActionOwner.USER,
+      recipientEmail: email,
+      notificationType: TokenNotificationType.EMAIL,
+      expiresAt: 15,
+      type: input.type,
+    });
+    return { tokenId: savedToken.tokenId };
   }
 }

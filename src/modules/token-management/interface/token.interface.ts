@@ -25,3 +25,8 @@ export class ValidateToken {
 
   ownerType: ActionOwner;
 }
+
+export interface RequestTokenByEmailInput {
+  email: string;
+  type: TokenType;
+}

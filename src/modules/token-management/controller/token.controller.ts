@@ -1,7 +1,10 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { TokenService } from '../service/token.service';
-import { ResendTokenDto } from '../dto/resend-token.dto';
+import {
+  RequestTokenByEmailDto,
+  ResendTokenDto,
+} from '../dto/resend-token.dto';
 
 @ApiTags('Token Management')
 @Controller('token')
@@ -13,6 +16,12 @@ export class TokenController {
     const result = await this.tokenService.resendByPreviousToken(
       dto.previousTokenId,
     );
+    return result;
+  }
+
+  @Post('request-by-email')
+  async requestTokenByEmail(@Body() dto: RequestTokenByEmailDto) {
+    const result = await this.tokenService.requestTokenByEmail(dto);
     return result;
   }
 }

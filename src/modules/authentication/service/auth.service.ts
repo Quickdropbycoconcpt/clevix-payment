@@ -48,6 +48,24 @@ export class AuthService {
     return result;
   }
 
+  /***
+   * This is useful if user didn't get token or user left the screen
+   */
+  async requestNewEmailToken(email: string) {
+    const account = await this.userService.dashBoardAuthentication(email);
+    const token = this.tokenService.generateNumericToken(6);
+    const saved = await this.tokenService.generateToken({
+      token,
+      ownerId: account.user.userId,
+      ownerType: ActionOwner.USER,
+      recipientEmail: email?.trim(),
+      notificationType: TokenNotificationType.EMAIL,
+      expiresAt: 60,
+      type: TokenType.EMAIL_VERIFICATION,
+    });
+    return { tokenId: saved.tokenId };
+  }
+
   async dashBoardAccessToken(
     payload: JwtPayload,
   ): Promise<{ accessToken: string; tokenType: 'Bearer'; expiresIn: string }> {
