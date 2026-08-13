@@ -2,7 +2,9 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { CollectionAdapterFactory } from '../../adapters/collection.adapter.factory';
 import { CollectionProvider } from '../../adapters/contracts/collection-adapter.types';
 import {
@@ -19,6 +21,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { SimulateInwardCreditDto } from '../dto/simulate-credit.dto';
 import {
   BasicStatus,
+  CollectionChannel,
   LedgerEntryDirection,
   RequestEnvironment,
   TransactionSource,
@@ -33,9 +36,17 @@ import {
   CreateIndividualStaticAccountDto,
 } from '../dto/create-static-account.dto';
 import { StaticWalletAccounts } from '../entity/wallet_account.entity';
+import { CreateDynamicVirtualAccountInput } from '../interface/virtual-account.interface';
+
+type DynamicVirtualAccountInput = CreateDynamicVirtualAccountInput & {
+  transactionSource?: TransactionSource;
+};
 
 @Injectable()
 export class VirtualAccountsService {
+  private readonly logger = new Logger(VirtualAccountsService.name);
+  private clearingExpiredDynamicAccounts = false;
+
   constructor(
     private readonly collectionAdapterFactory: CollectionAdapterFactory,
     private readonly virtualAccountCreditQueue: VirtualAccountCreditQueue,
@@ -46,7 +57,7 @@ export class VirtualAccountsService {
     private readonly txnService: TransactionService,
   ) {}
   async generateDynamicVirtualAccount(
-    dto: CreateDynamicVirtualAccountDto,
+    dto: DynamicVirtualAccountInput,
     scope: RequestScope,
   ): Promise<CreateVirtualAccountResult> {
     const businessScope = getBusinessScope(scope);
@@ -92,7 +103,7 @@ export class VirtualAccountsService {
         businessId: scope.businessId,
         validityTime,
         environment: scope.environment,
-        feeCharged: dto.feeCharged,
+        feeCharged: null,
       });
       await entityManager.save(dva);
       await this.txnService.createTransaction(
@@ -103,7 +114,8 @@ export class VirtualAccountsService {
           reference: ourRef,
           provider,
           currency: 'NGN',
-          source: TransactionSource.VIRTUAL_ACCOUNT_COLLECTION,
+          source: dto.transactionSource ?? TransactionSource.WALLET_FUNDING,
+          collectionChannel: CollectionChannel.VIRTUAL_ACCOUNT,
           environment: scope.environment,
           direction: LedgerEntryDirection.CREDIT,
           executionStatus: TransactionStatus.INITIATED,
@@ -126,11 +138,53 @@ export class VirtualAccountsService {
     return result;
   }
 
+  @Cron(CronExpression.EVERY_10_MINUTES)
+  async clearExpiredDynamicAccountsCron() {
+    if (this.clearingExpiredDynamicAccounts) {
+      return;
+    }
+
+    this.clearingExpiredDynamicAccounts = true;
+
+    try {
+      const expiredCount = await this.clearExpiredDynamicAccounts();
+
+      if (expiredCount > 0) {
+        this.logger.log(
+          `Marked ${expiredCount} expired dynamic virtual accounts as inactive`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        'Failed to clear expired dynamic virtual accounts',
+        error instanceof Error ? error.stack : String(error),
+      );
+    } finally {
+      this.clearingExpiredDynamicAccounts = false;
+    }
+  }
+
+  async clearExpiredDynamicAccounts(): Promise<number> {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const result = await this.dvaRepo
+      .createQueryBuilder()
+      .update(DynamicVirtualAccounts)
+      .set({
+        status: BasicStatus.INACTIVE,
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where('"status" = :status', { status: BasicStatus.ACTIVE })
+      .andWhere('"createdAt" <= :oneHourAgo', { oneHourAgo })
+      .execute();
+
+    return result.affected ?? 0;
+  }
+
   async simulateCredit(input: SimulateInwardCreditDto) {
     let walletAccount: StaticWalletAccounts;
-    console.log(input);
     const dva = await this.dvaRepo.findOne({
-      where: { accountNumber: input.accountNumber },
+      where: { accountNumber: input.accountNumber, status: BasicStatus.ACTIVE },
     });
     if (!dva) {
       walletAccount = await this.walletAcct.findOne({
@@ -139,11 +193,9 @@ export class VirtualAccountsService {
     }
 
     if (!walletAccount && !dva) {
-      throw new BadRequestException('Invalid account number');
+      throw new BadRequestException('Invalid request');
     }
-    if (dva?.status == BasicStatus.INACTIVE) {
-      throw new BadRequestException('Payment already processed');
-    }
+
     const adapter = this.collectionAdapterFactory.getVirtualAccountAdapter(
       dva?.provider ?? walletAccount.provider,
     );
@@ -291,14 +343,20 @@ export class VirtualAccountsService {
           accountNumber: result.receivedAccountNumber,
           status: BasicStatus.ACTIVE,
         },
-        { status: BasicStatus.INACTIVE },
+        { status: BasicStatus.INACTIVE, updatedAt: new Date() },
       );
     }
+    const sourceTransaction = dva
+      ? await this.txnService.getTransactionByMerchantRef(dva.merchantReference)
+      : null;
 
     await this.virtualAccountCreditQueue.addCreditJob({
       dvaId: walletAccount?.walletAccountId ?? dva?.dvaId,
       businessId: walletAccount?.businessId ?? dva?.businessId,
-      source: TransactionSource.VIRTUAL_ACCOUNT_COLLECTION,
+      source: sourceTransaction?.source ?? TransactionSource.WALLET_FUNDING,
+      collectionChannel:
+        sourceTransaction?.collectionChannel ??
+        CollectionChannel.VIRTUAL_ACCOUNT,
       environment: walletAccount?.environment ?? dva?.environment,
       provider: walletAccount?.provider ?? dva?.provider,
       merchantReference:

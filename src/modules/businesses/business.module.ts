@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Businesses } from './entity/business.entity';
 import { BusinessService } from './service/business.service';
@@ -8,6 +8,7 @@ import { CountryModule } from '../country-and-states/country.module';
 import { WalletModule } from '../wallets/wallets.module';
 import { BusinessMembersModule } from '../business-members/business-members.module';
 
+@Global()
 @Module({
   imports: [
     TypeOrmModule.forFeature([Businesses, User]),

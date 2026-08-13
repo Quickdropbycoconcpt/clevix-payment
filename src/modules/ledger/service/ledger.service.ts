@@ -119,6 +119,17 @@ export class LedgerService {
     };
   }
 
+  async getLedgerTransactionByReference(
+    reference: string,
+    entityManager?: EntityManager,
+  ) {
+    const repository =
+      entityManager?.getRepository(LedgerTransaction) ??
+      this.ledgerTransactions;
+
+    return repository.findOne({ where: { reference } });
+  }
+
   async getLedgerAccount(ownerId: string) {
     return await this.ledgerAccount.findOne({ where: { ownerId } });
   }
@@ -267,6 +278,7 @@ export class LedgerService {
     ]);
     const creditNormalAccountTypes = new Set<LedgerAccountType>([
       LedgerAccountType.CUSTOMER_CASH,
+      LedgerAccountType.SETTLEMENT_PAYABLE,
       LedgerAccountType.FEES_REVENUE,
       LedgerAccountType.PAYOUTS_CLEARING,
     ]);

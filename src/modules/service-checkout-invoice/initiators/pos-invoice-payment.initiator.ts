@@ -10,6 +10,7 @@ import {
 } from '../entity/invoice_transaction.entity';
 import { InvoiceFeeService } from '../fee/invoice-fee.service';
 import { validateIntent } from '../utils/validate-intent.util';
+import { TransactionSource } from 'src/shared/enum';
 
 @Injectable()
 export class PosInvoicePaymentInitiator implements InvoicePaymentInitiator {
@@ -41,10 +42,11 @@ export class PosInvoicePaymentInitiator implements InvoicePaymentInitiator {
         ...posIntent,
         amount: feePreview.totalAmount,
         currency: invoice.currencyCode,
-        reference: attempt.invoicePaymentTransactionId,
-        // Only override the wallet-credit fee computation when the fee was
-        // already baked into `totalAmount` (customer-borne). When the
-        // business bears it, let creditUserWallet compute/deduct it as usual.
+        reference: attempt.invoiceTransactionReference,
+        transactionSource: TransactionSource.CHECKOUT_INVOICE,
+        // Only override settlement fee computation when the fee was already
+        // baked into `totalAmount` (customer-borne). When the business bears
+        // it, let the settlement pipeline compute/deduct it as usual.
         feeCharged:
           feePreview.feeBearer === 'customer' ? feePreview.fee : undefined,
       } as ChargePosDto,

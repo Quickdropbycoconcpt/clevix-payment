@@ -39,6 +39,15 @@ export class OrganisationInvoice extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   merchantReference: string;
 
+  @Column({ type: 'varchar' })
+  payerFullName: string;
+
+  @Column({ type: 'varchar' })
+  payerEmail: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  phoneNumber: string | null;
+
   @Column({ type: 'jsonb' })
   formDetails: Record<string, any>;
 

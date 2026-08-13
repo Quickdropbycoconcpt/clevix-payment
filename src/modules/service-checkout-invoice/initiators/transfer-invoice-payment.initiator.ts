@@ -12,11 +12,8 @@ import {
 } from '../entity/invoice_transaction.entity';
 import { InvoiceFeeService } from '../fee/invoice-fee.service';
 import { validateIntent } from '../utils/validate-intent.util';
-import {
-  VIRTUAL_ACCOUNT_DEFAULT_VALIDITY_MINUTES,
-  VIRTUAL_ACCOUNT_MAX_VALIDITY_MINUTES,
-  VIRTUAL_ACCOUNT_MIN_VALIDITY_MINUTES,
-} from 'src/shared/constants/invoice.constants';
+
+import { TransactionSource } from 'src/shared/enum';
 
 @Injectable()
 export class TransferInvoicePaymentInitiator implements InvoicePaymentInitiator {
@@ -47,11 +44,12 @@ export class TransferInvoicePaymentInitiator implements InvoicePaymentInitiator 
       {
         accountName: business?.businessName ?? invoice.reference,
         amount: feePreview.totalAmount,
-        reference: attempt.invoicePaymentTransactionId,
+        reference: attempt.invoiceTransactionReference,
         validityTime: 2400,
-        // Only override the eventual wallet-credit fee computation when the
-        // fee was already baked into `amount` (customer-borne). When the
-        // business bears it, let creditUserWallet compute/deduct it as usual.
+        transactionSource: TransactionSource.CHECKOUT_INVOICE,
+        // Only override settlement fee computation when the fee was already
+        // baked into `amount` (customer-borne). When the business bears it,
+        // let the settlement pipeline compute/deduct it as usual.
         feeCharged:
           feePreview.feeBearer === 'customer' ? feePreview.fee : undefined,
       },

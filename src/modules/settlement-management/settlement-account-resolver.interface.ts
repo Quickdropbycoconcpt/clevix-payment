@@ -1,5 +1,8 @@
 export type SettlementAllocation = {
   settlementBankAccountId: string | null;
+  walletId?: string | null;
+  deductFee?: boolean;
+  metadata?: Record<string, unknown>;
   /** Gross (pre-fee) amount this allocation represents, bigint-as-string. */
   grossAmount: string;
 };

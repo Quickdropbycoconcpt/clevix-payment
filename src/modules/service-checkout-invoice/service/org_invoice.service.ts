@@ -8,7 +8,7 @@ import {
   PayInvoice,
   SelectedInvoiceItem,
 } from '../interface/invoice.interface';
-import { In, MoreThan, Repository } from 'typeorm';
+import { EntityManager, In, MoreThan, Repository } from 'typeorm';
 import {
   InvoiceStatus,
   OrganisationInvoice,
@@ -31,7 +31,11 @@ import * as Crypto from 'node:crypto';
 import { isEmail } from 'class-validator';
 import { ReconciliationService } from 'src/modules/reconciliation/reconciliation.service';
 import { WebhookService } from 'src/modules/webhooks/service/webhook.service';
-import { TransactionSource, TransactionStatus } from 'src/shared/enum';
+import {
+  TaxPayer,
+  TransactionSource,
+  TransactionStatus,
+} from 'src/shared/enum';
 import { InvoiceFeeService } from '../fee/invoice-fee.service';
 import { Businesses } from 'src/modules/businesses/entity/business.entity';
 import {
@@ -39,6 +43,16 @@ import {
   INVOICE_MAX_REFERENCE_GENERATION_ATTEMPTS,
   INVOICE_OPTION_BASED_FORM_TYPES,
 } from 'src/shared/constants/invoice.constants';
+import { TaxManagementService } from 'src/modules/tax-management/service/tax-management.service';
+import { generateRrn } from 'src/shared/utils';
+
+type ResolvedInvoiceItem = {
+  itemId: string;
+  amount: string;
+  baseAmount: string;
+  taxAmount: string;
+  taxId: string | null;
+};
 
 @Injectable()
 export class OrganisationInvoiceService {
@@ -52,155 +66,41 @@ export class OrganisationInvoiceService {
     private readonly feeService: InvoiceFeeService,
     @InjectRepository(Businesses)
     private readonly businessRepo: Repository<Businesses>,
+    private readonly taxManagementService: TaxManagementService,
   ) {}
 
   async createInvoice(input: CreateInvoice) {
     const service = await this.serviceService.getServiceById(input.serviceId);
 
-    if (!service.isActive) {
-      throw new BadRequestException('This service is not currently available');
-    }
+    this.validateServiceForInvoice(service, input);
 
     const business = await this.businessRepo.findOne({
       where: { businessId: service.businessId },
     });
 
-    this.validateFormDetails(service.customForms ?? [], input.formDetails);
+    const formDetails = input.formDetails;
 
-    const paymentRule = service.paymentrule;
-    if (!paymentRule) {
-      throw new BadRequestException(
-        'Payment rules are not configured for this service',
-      );
-    }
+    this.validateFormDetails(service.customForms ?? [], formDetails);
 
-    if (!service.customerPayForListOfItems && input.items.length !== 1) {
-      throw new BadRequestException(
-        'This service only accepts payment for a single item',
-      );
-    }
-
-    const resolvedItems = this.resolveInvoiceItems(service, input.items);
+    const paymentRule = this.getInvoicePaymentRule(service);
+    const resolvedItems = await this.resolveInvoiceItems(service, input.items);
     const amount = resolvedItems
       .reduce((total, item) => total + BigInt(item.amount), 0n)
       .toString();
+    const expiresAt = this.getInvoiceExpiryDate(
+      paymentRule.invoiceExpiryMinutes,
+    );
 
-    const submittedTotal = input.formDetails?.totalAmount;
+    this.validateSubmittedTotal(formDetails.totalAmount, amount);
 
-    if (submittedTotal !== undefined) {
-      let submittedTotalAmount: bigint;
-
-      try {
-        submittedTotalAmount = BigInt(submittedTotal);
-      } catch {
-        throw new BadRequestException(
-          'totalAmount must be an integer amount in the smallest currency unit',
-        );
-      }
-
-      if (submittedTotalAmount !== BigInt(amount)) {
-        throw new BadRequestException(
-          'totalAmount does not match the sum of selected items',
-        );
-      }
-    }
-
-    const expiresAt = paymentRule.invoiceExpiryMinutes
-      ? new Date(Date.now() + paymentRule.invoiceExpiryMinutes * 60 * 1000)
-      : null;
-
-    let invoice: OrganisationInvoice | undefined;
-
-    for (let attempt = 1; attempt <= INVOICE_MAX_REFERENCE_GENERATION_ATTEMPTS; attempt++) {
-      try {
-        invoice = await this.invoiceRepo.manager.transaction(
-          async (manager) => {
-            const invoiceRepo = manager.getRepository(OrganisationInvoice);
-            const invoiceItemRepo = manager.getRepository(InvoiceItem);
-
-            if (input.merchantReference) {
-              const existing = await invoiceRepo.findOne({
-                where: {
-                  businessId: service.businessId,
-                  merchantReference: input.merchantReference,
-                },
-                relations: { items: true },
-              });
-
-              if (existing) {
-                return existing;
-              }
-            }
-
-            const invoiceEntity = invoiceRepo.create({
-              businessId: service.businessId,
-              environment: service.environment,
-              serviceId: input.serviceId,
-              formDetails: input.formDetails,
-              amount,
-              currencyCode: paymentRule.currencyCode,
-              status: InvoiceStatus.PENDING,
-              expiresAt,
-              reference: this.generateInvoiceReference(),
-              merchantReference: input.merchantReference,
-              redemptionStatus: service.requiredRedemption
-                ? RedemptionStatus.NOT_USED
-                : null,
-            });
-
-            const savedInvoice = await invoiceRepo.save(invoiceEntity);
-
-            const invoiceItems = resolvedItems.map((resolved) =>
-              invoiceItemRepo.create({
-                businessId: savedInvoice.businessId,
-                environment: savedInvoice.environment,
-                amount: resolved.amount,
-                invoiceId: savedInvoice.invoiceId,
-                itemId: resolved.itemId,
-              }),
-            );
-
-            await invoiceItemRepo.save(invoiceItems);
-
-            return savedInvoice;
-          },
-        );
-
-        break;
-      } catch (error) {
-        if (
-          this.isReferenceCollision(error) &&
-          attempt < INVOICE_MAX_REFERENCE_GENERATION_ATTEMPTS
-        ) {
-          continue;
-        }
-
-        if (input.merchantReference && this.isUniqueViolation(error)) {
-          const existing = await this.invoiceRepo.findOneOrFail({
-            where: {
-              businessId: service.businessId,
-              merchantReference: input.merchantReference,
-            },
-            relations: { items: true },
-          });
-
-          return this.buildInvoiceResponse(
-            existing,
-            service,
-            business,
-            existing.items ?? [],
-          );
-        }
-
-        throw error;
-      }
-    }
-
-    if (!invoice) {
-      throw new BadRequestException(
-        'Failed to generate a unique invoice reference, please try again',
-      );
-    }
+    const invoice = await this.createInvoiceWithRetry(
+      input,
+      service,
+      paymentRule.currencyCode,
+      resolvedItems,
+      amount,
+      expiresAt,
+    );
 
     if (invoice.items) {
       return this.buildInvoiceResponse(
@@ -221,6 +121,9 @@ export class OrganisationInvoiceService {
         status: invoice.status,
         amount: invoice.amount,
         currencyCode: invoice.currencyCode,
+        payerFullName: invoice.payerFullName,
+        payerEmail: invoice.payerEmail,
+        phoneNumber: invoice.phoneNumber,
         serviceId: invoice.serviceId,
         expiresAt: invoice.expiresAt,
       },
@@ -229,11 +132,242 @@ export class OrganisationInvoiceService {
     return this.buildInvoiceResponse(invoice, service, business, resolvedItems);
   }
 
+  private validateServiceForInvoice(
+    service: OrganizationService,
+    input: CreateInvoice,
+  ) {
+    if (!service.isActive) {
+      throw new BadRequestException('This service is not currently available');
+    }
+
+    if (!service.customerPayForListOfItems && input.items.length !== 1) {
+      throw new BadRequestException(
+        'This service only accepts payment for a single item',
+      );
+    }
+  }
+
+  private getInvoicePaymentRule(service: OrganizationService) {
+    if (!service.paymentrule) {
+      throw new BadRequestException(
+        'Payment rules are not configured for this service',
+      );
+    }
+
+    return service.paymentrule;
+  }
+
+  private validateSubmittedTotal(
+    submittedTotal: unknown,
+    amount: string,
+  ): void {
+    if (submittedTotal === undefined) {
+      return;
+    }
+
+    if (this.toSubmittedTotalAmount(submittedTotal) !== BigInt(amount)) {
+      throw new BadRequestException(
+        'totalAmount does not match the sum of selected items',
+      );
+    }
+  }
+
+  private toSubmittedTotalAmount(submittedTotal: unknown) {
+    try {
+      return BigInt(submittedTotal as string | number | bigint | boolean);
+    } catch {
+      throw new BadRequestException(
+        'totalAmount must be an integer amount in the smallest currency unit',
+      );
+    }
+  }
+
+  private getInvoiceExpiryDate(invoiceExpiryMinutes?: number) {
+    return invoiceExpiryMinutes
+      ? new Date(Date.now() + invoiceExpiryMinutes * 60 * 1000)
+      : null;
+  }
+
+  private async createInvoiceWithRetry(
+    input: CreateInvoice,
+    service: OrganizationService,
+    currencyCode: string,
+    resolvedItems: ResolvedInvoiceItem[],
+    amount: string,
+    expiresAt: Date | null,
+  ) {
+    for (
+      let attempt = 1;
+      attempt <= INVOICE_MAX_REFERENCE_GENERATION_ATTEMPTS;
+      attempt++
+    ) {
+      try {
+        return await this.saveInvoiceWithItems(
+          input,
+          service,
+          currencyCode,
+          resolvedItems,
+          amount,
+          expiresAt,
+        );
+      } catch (error) {
+        if (this.shouldRetryInvoiceReference(error, attempt)) {
+          continue;
+        }
+
+        if (input.merchantReference && this.isUniqueViolation(error)) {
+          const existing = await this.findExistingInvoiceByMerchantReference(
+            input,
+            service,
+          );
+
+          if (existing) {
+            return existing;
+          }
+        }
+
+        throw error;
+      }
+    }
+
+    throw new BadRequestException(
+      'Failed to generate a unique invoice reference, please try again',
+    );
+  }
+
+  private shouldRetryInvoiceReference(error: unknown, attempt: number) {
+    return (
+      this.isReferenceCollision(error) &&
+      attempt < INVOICE_MAX_REFERENCE_GENERATION_ATTEMPTS
+    );
+  }
+
+  private async saveInvoiceWithItems(
+    input: CreateInvoice,
+    service: OrganizationService,
+    currencyCode: string,
+    resolvedItems: ResolvedInvoiceItem[],
+    amount: string,
+    expiresAt: Date | null,
+  ) {
+    return this.invoiceRepo.manager.transaction(async (manager) => {
+      const invoiceRepo = manager.getRepository(OrganisationInvoice);
+
+      const existing = await this.findExistingInvoiceByMerchantReference(
+        input,
+        service,
+        manager,
+      );
+
+      if (existing) {
+        return existing;
+      }
+
+      const savedInvoice = await invoiceRepo.save(
+        invoiceRepo.create({
+          businessId: service.businessId,
+          environment: service.environment,
+          serviceId: input.serviceId,
+          payerFullName: this.getRequiredFormString(
+            input.formDetails,
+            'payerFullName',
+          ),
+          payerEmail: this.getRequiredFormString(
+            input.formDetails,
+            'payerEmail',
+          ).toLowerCase(),
+          phoneNumber: this.getOptionalFormString(
+            input.formDetails,
+            'phoneNumber',
+          ),
+          formDetails: input.formDetails,
+          amount,
+          currencyCode,
+          status: InvoiceStatus.PENDING,
+          expiresAt,
+          reference: this.generateInvoiceReference(),
+          merchantReference: input.merchantReference,
+          redemptionStatus: service.requiredRedemption
+            ? RedemptionStatus.NOT_USED
+            : null,
+        }),
+      );
+
+      await this.saveInvoiceItems(savedInvoice, resolvedItems, manager);
+
+      return savedInvoice;
+    });
+  }
+
+  private async findExistingInvoiceByMerchantReference(
+    input: CreateInvoice,
+    service: OrganizationService,
+    manager?: EntityManager,
+  ) {
+    if (!input.merchantReference) {
+      return null;
+    }
+
+    const invoiceRepo =
+      manager?.getRepository(OrganisationInvoice) ?? this.invoiceRepo;
+
+    return invoiceRepo.findOne({
+      where: {
+        businessId: service.businessId,
+        merchantReference: input.merchantReference,
+      },
+      relations: { items: true },
+    });
+  }
+
+  private async saveInvoiceItems(
+    invoice: OrganisationInvoice,
+    resolvedItems: ResolvedInvoiceItem[],
+    manager: EntityManager,
+  ) {
+    const invoiceItemRepo = manager.getRepository(InvoiceItem);
+    const invoiceItems = resolvedItems.map((resolved) =>
+      invoiceItemRepo.create({
+        businessId: invoice.businessId,
+        environment: invoice.environment,
+        amount: resolved.amount,
+        baseAmount: resolved.baseAmount,
+        taxAmount: resolved.taxAmount,
+        taxId: resolved.taxId,
+        invoiceId: invoice.invoiceId,
+        itemId: resolved.itemId,
+      }),
+    );
+    const savedInvoiceItems = await invoiceItemRepo.save(invoiceItems);
+
+    await this.taxManagementService.createAssessedTaxTransactions(
+      savedInvoiceItems
+        .filter((item) => item.taxId && BigInt(item.taxAmount) > 0n)
+        .map((item) => ({
+          businessId: item.businessId,
+          environment: item.environment,
+          invoiceId: item.invoiceId,
+          invoiceItemId: item.invoiceItemId,
+          itemId: item.itemId,
+          taxId: item.taxId as string,
+          baseAmount: item.baseAmount,
+          taxAmount: item.taxAmount,
+        })),
+      manager,
+    );
+  }
+
   private buildInvoiceResponse(
     invoice: OrganisationInvoice,
     service: OrganizationService,
     business: Businesses | null,
-    items: { itemId: string; amount: string }[],
+    items: {
+      itemId: string;
+      amount: string;
+      baseAmount?: string;
+      taxAmount?: string;
+      taxId?: string | null;
+    }[],
   ) {
     return {
       invoiceId: invoice.invoiceId,
@@ -242,6 +376,10 @@ export class OrganisationInvoiceService {
       amount: invoice.amount,
       currencyCode: invoice.currencyCode,
       status: invoice.status,
+      payerFullName: invoice.payerFullName,
+      payerEmail: invoice.payerEmail,
+      phoneNumber: invoice.phoneNumber,
+      formDetails: invoice.formDetails,
       expiresAt: invoice.expiresAt,
       createdAt: invoice.createdAt,
       business: {
@@ -258,14 +396,27 @@ export class OrganisationInvoiceService {
           (serviceItem) => serviceItem.itemId === item.itemId,
         )?.name,
         amount: item.amount,
+        baseAmount: item.baseAmount ?? item.amount,
+        taxAmount: item.taxAmount ?? '0',
+        taxId: item.taxId ?? null,
       })),
     };
   }
 
-  private resolveInvoiceItems(
+  private async resolveInvoiceItems(
     service: OrganizationService,
     selectedItems: SelectedInvoiceItem[],
   ) {
+    const taxIds = [
+      ...new Set(
+        (service.items ?? [])
+          .map((item) => item.taxId)
+          .filter((taxId): taxId is string => Boolean(taxId)),
+      ),
+    ];
+    const activeTaxConfigs =
+      await this.taxManagementService.getActiveTaxConfigurations(taxIds);
+
     return selectedItems.map((selection) => {
       const item = service.items?.find(
         (serviceItem) => serviceItem.itemId === selection.itemId,
@@ -277,15 +428,36 @@ export class OrganisationInvoiceService {
         );
       }
 
-      const amount = item.fixedPrice ? item.fixedAmount : selection.amount;
+      const baseAmount = item.fixedPrice ? item.fixedAmount : selection.amount;
 
-      if (!amount) {
+      if (!baseAmount) {
         throw new BadRequestException(
           `Amount is required for item ${item.name}`,
         );
       }
 
-      return { itemId: item.itemId, amount };
+      const tax = item.taxId ? activeTaxConfigs.get(item.taxId) : null;
+
+      if (item.taxId && !tax) {
+        throw new BadRequestException(
+          `Tax configuration is inactive or unavailable for item ${item.name}`,
+        );
+      }
+
+      const taxAmount = tax
+        ? this.taxManagementService.calculateTaxAmount(baseAmount, tax.rate)
+        : 0n;
+      const invoiceAmount =
+        BigInt(baseAmount) +
+        (tax?.payer === TaxPayer.CUSTOMER ? taxAmount : 0n);
+
+      return {
+        itemId: item.itemId,
+        amount: invoiceAmount.toString(),
+        baseAmount,
+        taxAmount: taxAmount.toString(),
+        taxId: item.taxId ?? null,
+      };
     });
   }
 
@@ -293,7 +465,7 @@ export class OrganisationInvoiceService {
     const digits = () => Crypto.randomInt(0, 10000).toString().padStart(4, '0');
     const letters = () =>
       Array.from({ length: 4 }, () =>
-        String.fromCharCode(65 + Crypto.randomInt(0, 26)),
+        String.fromCodePoint(65 + Crypto.randomInt(0, 26)),
       ).join('');
 
     return `${digits()}-${letters()}-${digits()}`;
@@ -333,7 +505,7 @@ export class OrganisationInvoiceService {
       async (manager) => {
         const invoiceRepo = manager.getRepository(OrganisationInvoice);
         const txnRepo = manager.getRepository(InvoicePaymentTransaction);
-
+        const txnReference = generateRrn();
         const lockedInvoice = await invoiceRepo.findOne({
           where: { reference: input.reference },
           lock: { mode: 'pessimistic_write' },
@@ -377,6 +549,7 @@ export class OrganisationInvoiceService {
         return txnRepo.save(
           txnRepo.create({
             businessId: lockedInvoice.businessId,
+            invoiceTransactionReference: txnReference,
             environment: lockedInvoice.environment,
             method: input.method,
             invoice: lockedInvoice,
@@ -394,11 +567,11 @@ export class OrganisationInvoiceService {
     const result = await initiator.initiate(invoice, attempt, input.intent);
 
     await this.reconciliationService.reconcile(
-      attempt.invoicePaymentTransactionId,
+      attempt.invoiceTransactionReference,
     );
 
     return {
-      invoicePaymentTransactionId: attempt.invoicePaymentTransactionId,
+      invoicePaymentTransactionId: attempt.invoiceTransactionReference,
       ...result,
     };
   }
@@ -409,45 +582,169 @@ export class OrganisationInvoiceService {
   ) {
     for (const form of forms) {
       const value = formDetails?.[form.formKey];
-      const hasValue = value !== undefined && value !== null && value !== '';
 
-      if (form.required === 'Y' && !hasValue) {
-        throw new BadRequestException(`${form.formLabel} is required`);
-      }
+      this.validateRequiredFormValue(form, value);
 
-      if (!hasValue) {
+      if (!this.hasFormValue(value)) {
         continue;
       }
 
-      if (INVOICE_OPTION_BASED_FORM_TYPES.includes(form.formType)) {
-        const validOptions = (form.options ?? []).map((option) => option.value);
-        const submittedValues = Array.isArray(value) ? value : [value];
-        const isValid = submittedValues.every((submitted) =>
-          validOptions.includes(submitted),
-        );
-
-        if (!isValid) {
-          throw new BadRequestException(
-            `Invalid value for ${form.formLabel}. Expected one of: ${validOptions.join(', ')}`,
-          );
-        }
-
-        continue;
-      }
-
-      if (form.formType === FormType.EMAIL && !isEmail(value)) {
-        throw new BadRequestException(
-          `${form.formLabel} must be a valid email`,
-        );
-      }
-
-      if (form.formType === FormType.NUMBER && Number.isNaN(Number(value))) {
-        throw new BadRequestException(`${form.formLabel} must be a number`);
-      }
-
-      if (form.formType === FormType.DATE && Number.isNaN(Date.parse(value))) {
-        throw new BadRequestException(`${form.formLabel} must be a valid date`);
-      }
+      this.validateSubmittedFormValue(form, value);
     }
+  }
+
+  private getRequiredFormString(
+    formDetails: Record<string, any>,
+    key: string,
+  ): string {
+    const value = this.getOptionalFormString(formDetails, key);
+
+    if (!value) {
+      throw new BadRequestException(`${key} is required`);
+    }
+
+    return value;
+  }
+
+  private getOptionalFormString(
+    formDetails: Record<string, any>,
+    key: string,
+  ): string | null {
+    const value = formDetails[key];
+
+    if (value === undefined || value === null || value === '') {
+      return null;
+    }
+
+    if (
+      typeof value !== 'string' &&
+      typeof value !== 'number' &&
+      typeof value !== 'boolean'
+    ) {
+      throw new BadRequestException(`${key} must be a valid value`);
+    }
+
+    return String(value).trim();
+  }
+
+  private validateRequiredFormValue(
+    form: OrganisationCustomForm,
+    value: unknown,
+  ) {
+    if (form.required === 'Y' && !this.hasFormValue(value)) {
+      throw new BadRequestException(`${form.formLabel} is required`);
+    }
+  }
+
+  private hasFormValue(value: unknown) {
+    return value !== undefined && value !== null && value !== '';
+  }
+
+  private validateSubmittedFormValue(
+    form: OrganisationCustomForm,
+    value: unknown,
+  ) {
+    if (INVOICE_OPTION_BASED_FORM_TYPES.includes(form.formType)) {
+      this.validateOptionBasedFormValue(form, value);
+      return;
+    }
+
+    this.validateTypedFormValue(form, value);
+  }
+
+  private validateOptionBasedFormValue(
+    form: OrganisationCustomForm,
+    value: unknown,
+  ) {
+    const validOptions = (form.options ?? []).map((option) => option.value);
+    const submittedValues = Array.isArray(value) ? value : [value];
+    const isValid = submittedValues.every((submitted) =>
+      validOptions.includes(this.toSubmittedOptionValue(form, submitted)),
+    );
+
+    if (!isValid) {
+      throw new BadRequestException(
+        `Invalid value for ${form.formLabel}. Expected one of: ${validOptions.join(', ')}`,
+      );
+    }
+  }
+
+  private toSubmittedOptionValue(
+    form: OrganisationCustomForm,
+    value: unknown,
+  ): string {
+    const scalarValue = this.getScalarFormValue(form, value);
+
+    return typeof scalarValue === 'string'
+      ? scalarValue
+      : scalarValue.toString();
+  }
+
+  private getScalarFormValue(
+    form: OrganisationCustomForm,
+    value: unknown,
+  ): string | number | boolean {
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      return value;
+    }
+
+    throw new BadRequestException(`${form.formLabel} must be a valid value`);
+  }
+
+  private validateTypedFormValue(form: OrganisationCustomForm, value: unknown) {
+    if (form.formType === FormType.EMAIL) {
+      this.validateEmailFormValue(form, value);
+    }
+
+    if (form.formType === FormType.NUMBER) {
+      this.validateNumberFormValue(form, value);
+    }
+
+    if (form.formType === FormType.DATE) {
+      this.validateDateFormValue(form, value);
+    }
+  }
+
+  private validateEmailFormValue(form: OrganisationCustomForm, value: unknown) {
+    if (typeof value !== 'string') {
+      throw new BadRequestException(`${form.formLabel} must be a valid email`);
+    }
+
+    if (!isEmail(value)) {
+      throw new BadRequestException(`${form.formLabel} must be a valid email`);
+    }
+  }
+
+  private validateNumberFormValue(
+    form: OrganisationCustomForm,
+    value: unknown,
+  ) {
+    const scalarValue = this.getScalarFormValue(form, value);
+
+    if (typeof scalarValue === 'boolean' || Number.isNaN(Number(scalarValue))) {
+      throw new BadRequestException(`${form.formLabel} must be a number`);
+    }
+  }
+
+  private validateDateFormValue(form: OrganisationCustomForm, value: unknown) {
+    if (!this.isValidDateFormValue(value)) {
+      throw new BadRequestException(`${form.formLabel} must be a valid date`);
+    }
+  }
+
+  private isValidDateFormValue(value: unknown) {
+    if (typeof value === 'string') {
+      return !Number.isNaN(Date.parse(value));
+    }
+
+    if (typeof value === 'number') {
+      return !Number.isNaN(new Date(value).getTime());
+    }
+
+    return false;
   }
 }

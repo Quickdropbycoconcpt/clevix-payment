@@ -1,10 +1,14 @@
+import { RequestEnvironment } from 'src/shared/enum';
 import { Column, DeleteDateColumn } from 'typeorm';
 
 export class BaseEntity {
   @Column({ type: 'uuid' })
   businessId: string;
 
-  @Column({ type: 'varchar' })
+  @Column({
+    type: 'enum',
+    enum: RequestEnvironment,
+  })
   environment: string;
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })

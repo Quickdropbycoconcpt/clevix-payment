@@ -92,7 +92,7 @@ export class BusinessController {
       return await this.businessService.environmentSwitching(scope.businessId);
     } catch (error) {
       this.logger.error(error);
-      throw new BadRequestException('Something went wrong');
+      throw new BadRequestException(error.message);
     }
   }
 }

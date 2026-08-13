@@ -8,12 +8,12 @@ import {
   CardPaymentWebhookJobData,
 } from './card-payment-webhook.job';
 import { Repository } from 'typeorm';
-import { TransactionSource, TransactionStatus } from 'src/shared/enum';
+import { CollectionChannel, TransactionStatus } from 'src/shared/enum';
 import { TransactionService } from 'src/modules/transactions/service/transaction.service';
 import { Transactions } from 'src/modules/transactions/entity/transaction.entity';
-import { WalletService } from 'src/modules/wallets/service/wallets.service';
 import { ReconciliationService } from 'src/modules/reconciliation/reconciliation.service';
 import { WebhookService } from 'src/modules/webhooks/service/webhook.service';
+import { SettlementService } from 'src/modules/settlement-management/service/settlement.account.service';
 
 @Injectable()
 @Processor(CARD_PAYMENT_WEBHOOK_QUEUE)
@@ -23,7 +23,7 @@ export class CardPaymentWebhookProcessor extends WorkerHost {
   constructor(
     @InjectRepository(CardTransactions)
     private readonly cardTransactionRepo: Repository<CardTransactions>,
-    private readonly walletService: WalletService,
+    private readonly settlementService: SettlementService,
     private readonly transactionService: TransactionService,
     private readonly reconciliationService: ReconciliationService,
     private readonly webhookService: WebhookService,
@@ -69,22 +69,25 @@ export class CardPaymentWebhookProcessor extends WorkerHost {
       const merchantReference =
         transaction.merchantReference ?? webhook.reference;
 
-      const processedTransaction = await this.walletService.creditUserWallet({
-        businessId: transaction.businessId,
-        environment: transaction.environment,
-        currency: transaction.currency,
-        provider,
-        source: TransactionSource.DEBIT_CARD_COLLECTION,
-        amount,
-        reference: transaction.reference,
-        sourceId: transaction.sourceId,
-        merchantReference,
-        providerReference: webhook.providerReference,
-        feeCharged: cardTransaction?.feeCharged,
-        metadata: {
-          providerWebhook: raw,
-        },
-      });
+      const processedTransaction =
+        await this.settlementService.createSettlement({
+          businessId: transaction.businessId,
+          environment: transaction.environment,
+          currency: transaction.currency,
+          provider,
+          source: transaction.source,
+          collectionChannel:
+            transaction.collectionChannel ?? CollectionChannel.DEBIT_CARD,
+          amount,
+          reference: transaction.reference,
+          sourceId: transaction.sourceId,
+          merchantReference,
+          providerReference: webhook.providerReference,
+          feeCharged: cardTransaction?.feeCharged,
+          metadata: {
+            providerWebhook: raw,
+          },
+        });
 
       if (cardTransaction) {
         await this.cardTransactionRepo.update(
@@ -99,7 +102,7 @@ export class CardPaymentWebhookProcessor extends WorkerHost {
         businessId: transaction.businessId,
         environment: transaction.environment,
         transactionId: processedTransaction.transactionId,
-        type: TransactionSource.DEBIT_CARD_COLLECTION,
+        type: CollectionChannel.DEBIT_CARD,
         payload: {
           reference: merchantReference,
           providerReference: webhook.providerReference,
@@ -140,5 +143,4 @@ export class CardPaymentWebhookProcessor extends WorkerHost {
       where: { reference },
     });
   }
-
 }

@@ -9,10 +9,10 @@ import { DynamicVirtualAccounts } from './entity/dynamic_va.entity';
 import { VIRTUAL_ACCOUNT_CREDIT_QUEUE } from './jobs/virtual-account-credit.job';
 import { VirtualAccountCreditProcessor } from './jobs/virtual-account-credit.processor';
 import { VirtualAccountCreditQueue } from './jobs/virtual-account-credit.queue';
-import { WalletModule } from 'src/modules/wallets/wallets.module';
 import { TransactionModule } from 'src/modules/transactions/transactions.module';
 import { ReconciliationModule } from 'src/modules/reconciliation/reconciliation.module';
 import { StaticWalletAccounts } from './entity/wallet_account.entity';
+import { SettlementManagementModule } from 'src/modules/settlement-management/settlement-management.module';
 
 @Module({
   imports: [
@@ -22,8 +22,8 @@ import { StaticWalletAccounts } from './entity/wallet_account.entity';
     }),
     VfdModule,
     TransactionModule,
-    WalletModule,
     ReconciliationModule,
+    SettlementManagementModule,
   ],
   controllers: [VirtualAccountsController],
   providers: [

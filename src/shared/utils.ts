@@ -148,11 +148,16 @@ export function generateRrn(): string {
 
 export type SettlementSharingAllocation = {
   settlementBankAccountId: string | null;
+  walletId?: string | null;
   grossAmount: string;
+  deductFee?: boolean;
+  metadata?: Record<string, unknown>;
 };
 
 export type SettlementShare = {
   settlementBankAccountId: string | null;
+  walletId?: string | null;
+  metadata?: Record<string, unknown>;
   amount: bigint;
 };
 
@@ -192,40 +197,66 @@ export function allocateSettlementShares(
   if (feeCharged) {
     return allocations.map((allocation) => ({
       settlementBankAccountId: allocation.settlementBankAccountId,
+      walletId: allocation.walletId,
+      metadata: allocation.metadata,
       amount: BigInt(allocation.grossAmount),
     }));
   }
 
+  const feeBearingAllocations = allocations.filter(
+    (allocation) => allocation.deductFee !== false,
+  );
+  const feeBearingGrossAmount = feeBearingAllocations.reduce(
+    (sum, allocation) => sum + BigInt(allocation.grossAmount),
+    0n,
+  );
+
+  if (merchantFee > 0n && feeBearingGrossAmount <= 0n) {
+    throw new BadRequestException(
+      'Settlement allocations have no fee-bearing amount to deduct fee from',
+    );
+  }
+
   const feeShares = allocations.map((allocation) => {
     const grossAmount = BigInt(allocation.grossAmount);
-    const feeProduct = merchantFee * grossAmount;
+    const shouldDeductFee = allocation.deductFee !== false;
+    const feeProduct = shouldDeductFee ? merchantFee * grossAmount : 0n;
 
     return {
       settlementBankAccountId: allocation.settlementBankAccountId,
+      walletId: allocation.walletId,
+      metadata: allocation.metadata,
       grossAmount,
-      fee: feeProduct / totalGrossAmount,
-      feeRemainder: feeProduct % totalGrossAmount,
+      deductFee: shouldDeductFee,
+      fee: shouldDeductFee ? feeProduct / feeBearingGrossAmount : 0n,
+      feeRemainder: shouldDeductFee ? feeProduct % feeBearingGrossAmount : 0n,
     };
   });
 
   const flooredFeeTotal = feeShares.reduce((sum, entry) => sum + entry.fee, 0n);
   let feeLeftover = merchantFee - flooredFeeTotal;
 
-  const byFeeRemainderDesc = [...feeShares].sort((a, b) =>
-    b.feeRemainder > a.feeRemainder
-      ? 1
-      : b.feeRemainder < a.feeRemainder
-        ? -1
-        : 0,
-  );
+  const byFeeRemainderDesc = [...feeShares]
+    .filter((entry) => entry.deductFee)
+    .sort((a, b) =>
+      b.feeRemainder > a.feeRemainder
+        ? 1
+        : b.feeRemainder < a.feeRemainder
+          ? -1
+          : 0,
+    );
 
   for (let i = 0; i < byFeeRemainderDesc.length && feeLeftover > 0n; i++) {
     byFeeRemainderDesc[i].fee += 1n;
     feeLeftover -= 1n;
   }
 
-  return feeShares.map(({ settlementBankAccountId, grossAmount, fee }) => ({
-    settlementBankAccountId,
-    amount: grossAmount - fee,
-  }));
+  return feeShares.map(
+    ({ settlementBankAccountId, walletId, metadata, grossAmount, fee }) => ({
+      settlementBankAccountId,
+      walletId,
+      metadata,
+      amount: grossAmount - fee,
+    }),
+  );
 }

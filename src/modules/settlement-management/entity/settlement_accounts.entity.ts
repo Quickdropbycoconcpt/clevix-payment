@@ -1,5 +1,12 @@
 import { BaseEntity } from 'src/infrastructure/database/base_entiy';
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Banks } from 'src/modules/Api/banks/entity/banks.entity';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 
 @Entity('SettlementBankAccounts')
 export class SettlementBankAccounts extends BaseEntity {
@@ -15,6 +22,10 @@ export class SettlementBankAccounts extends BaseEntity {
   @Column({ type: 'varchar' })
   accountName: string;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'uuid' })
   providerbankId: string;
+
+  @ManyToOne(() => Banks)
+  @JoinColumn({ name: 'providerbankId', referencedColumnName: 'bankId' })
+  bank: Banks;
 }

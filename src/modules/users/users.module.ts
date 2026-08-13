@@ -6,6 +6,7 @@ import { BusinessModule } from '../businesses/business.module';
 import { WalletModule } from '../wallets/wallets.module';
 import { BusinessMembersModule } from '../business-members/business-members.module';
 import { CountryModule } from '../country-and-states/country.module';
+import { UserController } from './controller/user.controller';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { CountryModule } from '../country-and-states/country.module';
     WalletModule,
     CountryModule,
   ],
+  controllers: [UserController],
   providers: [UserService],
   exports: [UserService],
 })

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
 
 export class AddSettlementBankDto {
   @IsString()
@@ -9,7 +9,7 @@ export class AddSettlementBankDto {
   @IsNotEmpty()
   accountName: string;
 
-  @IsString()
+  @IsUUID()
   @IsNotEmpty()
   providerbankId: string;
 }

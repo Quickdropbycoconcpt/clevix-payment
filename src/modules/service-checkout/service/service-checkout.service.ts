@@ -1,5 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { In, Repository } from 'typeorm';
 import { OrganizationService } from '../entity/service_definition.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrganisationPaymentRules } from '../entity/service_payment_rules.entity';
@@ -11,14 +15,21 @@ import {
 } from '../entity/service_payment_form.entity';
 import { OrganisationFormOption } from '../entity/service_payment_form_option.entity';
 import { ServiceItems } from '../entity/service_items.entity';
+import { BanksService } from 'src/modules/Api/banks/service/banks.service';
+import { SettlementBankAccounts } from 'src/modules/settlement-management/entity/settlement_accounts.entity';
+import { getBusinessScope, RequestScope } from 'src/shared/business-scope';
+import { createOffsetPaginatedResponse } from 'src/shared/http/pagination';
 
 @Injectable()
 export class ServiceCheckout {
   constructor(
     @InjectRepository(OrganizationService)
     private readonly serviceRepo: Repository<OrganizationService>,
+    private readonly banksService: BanksService,
     @InjectRepository(OrganisationCustomForm)
     private readonly customForms: Repository<OrganisationCustomForm>,
+    @InjectRepository(SettlementBankAccounts)
+    private readonly settlementAccountRepo: Repository<SettlementBankAccounts>,
   ) {}
 
   async getMandatoryFields(environment: string) {
@@ -71,7 +82,7 @@ export class ServiceCheckout {
       relations: {
         paymentrule: true,
         customForms: { options: true },
-        items: true,
+        items: { tax: true },
       },
     });
 
@@ -102,7 +113,21 @@ export class ServiceCheckout {
       const customFormRepo = manager.getRepository(OrganisationCustomForm);
       const formOptionRepo = manager.getRepository(OrganisationFormOption);
       const serviceItemRepo = manager.getRepository(ServiceItems);
-
+      const bankAccountIds = input.items
+        .filter((item) => item.settlementAccountId != null)
+        .map((i) => i.settlementAccountId);
+      if (bankAccountIds.length != 0) {
+        const banks = await this.settlementAccountRepo.find({
+          where: {
+            providerbankId: In(bankAccountIds),
+          },
+        });
+        if (banks.length != bankAccountIds.length) {
+          throw new BadRequestException(
+            `Please select from account you have added`,
+          );
+        }
+      }
       const newPaymentRule = paymentRuleRepo.create({
         businessId: input.businessId,
         environment: input.environment,
@@ -134,6 +159,7 @@ export class ServiceCheckout {
           fixedPrice: item.fixedPrice,
           fixedAmount: item.fixedAmount,
           settlementAccountId: item.settlementAccountId,
+          taxId: item.taxId ?? null,
           service: { serviceId: service.serviceId } as OrganizationService,
         }),
       );
@@ -174,5 +200,27 @@ export class ServiceCheckout {
 
       return { serviceName: service.serviceName };
     });
+  }
+
+  async listServices(scope: RequestScope, name: string) {
+    const { businessId, environment, pagination } = getBusinessScope(scope);
+    const query = this.serviceRepo
+      .createQueryBuilder('service')
+      .leftJoinAndSelect('service.paymentrule', 'paymentrule')
+      .where('service.businessId = :businessId', { businessId })
+      .andWhere('service.environment = :environment', { environment })
+      .orderBy('service.createdAt', 'DESC')
+      .skip(pagination.skip)
+      .take(pagination.take);
+
+    if (name?.trim()) {
+      query.andWhere('service.serviceName ILIKE :name', {
+        name: `%${name.trim()}%`,
+      });
+    }
+
+    const [services, total] = await query.getManyAndCount();
+
+    return createOffsetPaginatedResponse(services, pagination, { total });
   }
 }

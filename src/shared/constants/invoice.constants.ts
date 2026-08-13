@@ -1,4 +1,4 @@
-import { TransactionSource } from '../enum';
+import { CollectionChannel } from '../enum';
 import { SupportedPaymentMethod } from 'src/modules/service-checkout-invoice/entity/invoice_transaction.entity';
 import { FormType } from 'src/modules/service-checkout/entity/service_payment_form.entity';
 
@@ -16,11 +16,11 @@ export const VIRTUAL_ACCOUNT_MIN_VALIDITY_MINUTES = 1;
 export const VIRTUAL_ACCOUNT_MAX_VALIDITY_MINUTES = 1440;
 export const VIRTUAL_ACCOUNT_DEFAULT_VALIDITY_MINUTES = 30;
 
-export const FEE_SOURCE_BY_METHOD: Record<
+export const COLLECTION_CHANNEL_BY_METHOD: Record<
   SupportedPaymentMethod,
-  TransactionSource
+  CollectionChannel
 > = {
-  [SupportedPaymentMethod.POS]: TransactionSource.POS_COLLECTION,
-  [SupportedPaymentMethod.TRANSFER]: TransactionSource.VIRTUAL_ACCOUNT_COLLECTION,
-  [SupportedPaymentMethod.CARD]: TransactionSource.DEBIT_CARD_COLLECTION,
+  [SupportedPaymentMethod.POS]: CollectionChannel.POS,
+  [SupportedPaymentMethod.TRANSFER]: CollectionChannel.VIRTUAL_ACCOUNT,
+  [SupportedPaymentMethod.CARD]: CollectionChannel.DEBIT_CARD,
 };

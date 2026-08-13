@@ -38,6 +38,7 @@ export class EmailTemplateService {
       subject,
       currentYear: new Date().getFullYear(),
     };
+
     const content = this.renderTemplateFile(
       templateDefinition.html,
       viewContext,
@@ -53,7 +54,9 @@ export class EmailTemplateService {
   }
 
   private renderSubject<TemplateName extends EmailTemplateName>(
-    subject: string | ((context: EmailTemplateContextMap[TemplateName]) => string),
+    subject:
+      | string
+      | ((context: EmailTemplateContextMap[TemplateName]) => string),
     context: EmailTemplateContextMap[TemplateName],
   ): string {
     return typeof subject === 'function' ? subject(context) : subject;
@@ -68,7 +71,9 @@ export class EmailTemplateService {
     return compiledTemplate(context);
   }
 
-  private getCompiledTemplate(templatePath: string): Handlebars.TemplateDelegate {
+  private getCompiledTemplate(
+    templatePath: string,
+  ): Handlebars.TemplateDelegate {
     const cachedTemplate = this.compiledTemplates.get(templatePath);
 
     if (cachedTemplate) {

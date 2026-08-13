@@ -5,18 +5,17 @@ import {
   VIRTUAL_ACCOUNT_CREDIT_QUEUE,
   VirtualAccountCreditJobData,
 } from './virtual-account-credit.job';
-import { WalletService } from 'src/modules/wallets/service/wallets.service';
-import { TransactionSource } from 'src/shared/enum';
 import { MoneyValueConverter } from 'src/shared/converter';
 import { WebhookService } from 'src/modules/webhooks/service/webhook.service';
 import { ReconciliationService } from 'src/modules/reconciliation/reconciliation.service';
+import { SettlementService } from 'src/modules/settlement-management/service/settlement.account.service';
 
 @Injectable()
 @Processor(VIRTUAL_ACCOUNT_CREDIT_QUEUE)
 export class VirtualAccountCreditProcessor extends WorkerHost {
   constructor(
     private readonly webhookService: WebhookService,
-    private readonly walletService: WalletService,
+    private readonly settlementService: SettlementService,
     private readonly reconciliationService: ReconciliationService,
   ) {
     super();
@@ -37,8 +36,9 @@ export class VirtualAccountCreditProcessor extends WorkerHost {
         dvaId,
         merchantReference,
         feeCharged,
+        collectionChannel,
       } = job.data;
-      await this.walletService.creditUserWallet({
+      await this.settlementService.createSettlement({
         businessId,
         amount: MoneyValueConverter.fromNairaToKobo(
           credit.amount.toString(),
@@ -46,7 +46,8 @@ export class VirtualAccountCreditProcessor extends WorkerHost {
         reference: credit.reference,
         currency: 'NGN',
         provider,
-        source: TransactionSource.VIRTUAL_ACCOUNT_COLLECTION,
+        source: job.data.source,
+        collectionChannel,
         environment,
         sourceId: dvaId,
         merchantReference,
@@ -61,14 +62,22 @@ export class VirtualAccountCreditProcessor extends WorkerHost {
         },
       });
 
-      await this.reconciliationService.reconcile(merchantReference);
+      const reconcile =
+        await this.reconciliationService.reconcile(merchantReference);
+
+      if (reconcile) {
+        return {
+          processed: true,
+          merchantReference: job.data.merchantReference,
+        };
+      }
 
       /**
        * Dispatch virtual collection webhook to merchant
        */
       await this.webhookService.dispatchWebhook({
         businessId: businessId,
-        type: TransactionSource.VIRTUAL_ACCOUNT_COLLECTION,
+        type: collectionChannel,
         environment,
         payload: {
           senderAccountNumber: credit.senderAccountNumber,

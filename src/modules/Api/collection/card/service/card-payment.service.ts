@@ -11,6 +11,7 @@ import { RequestScope } from 'src/shared/business-scope';
 import { CardPaymentDto, ValidateCardOtpDto } from '../dto/card.dto';
 import { TransactionService } from 'src/modules/transactions/service/transaction.service';
 import {
+  CollectionChannel,
   LedgerEntryDirection,
   TransactionSource,
   TransactionStatus,
@@ -20,6 +21,7 @@ import { CardPaymentWebhookQueue } from '../jobs/card-payment-webhook.queue';
 
 type InitiateCardPaymentInput = CardPaymentDto & {
   feeCharged?: string;
+  transactionSource?: TransactionSource;
 };
 
 @Injectable()
@@ -69,7 +71,8 @@ export class CardPaymentService {
             reference: ourRef,
             provider,
             currency: 'NGN',
-            source: TransactionSource.DEBIT_CARD_COLLECTION,
+            source: input.transactionSource ?? TransactionSource.WALLET_FUNDING,
+            collectionChannel: CollectionChannel.DEBIT_CARD,
             environment: scope.environment,
             direction: LedgerEntryDirection.CREDIT,
             executionStatus: TransactionStatus.INITIATED,

@@ -9,3 +9,25 @@ export type UpsertBusinessSettlementConfig = {
   settlementType: BusinessSettlementType;
   settlementLocation: SettlementLocation;
 };
+
+export type ExternalBankSettlement = {
+  amount: string;
+
+  accountNumber: string;
+
+  accountName: string;
+
+  currency: string;
+
+  bankCode: string;
+
+  reference: string;
+
+  environment: string;
+
+  narration?: string;
+
+  senderAccount?: string;
+
+  merchantReference?: string;
+};

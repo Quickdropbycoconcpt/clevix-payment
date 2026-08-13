@@ -9,8 +9,31 @@ export type WelcomeEmailContext = {
   loginUrl?: string;
 };
 
+export type OtpContext = {
+  token: string;
+  name?: string;
+  link?: string;
+  productName?: string;
+};
+
+export type EmailConfirmationContext = {
+  name?: string;
+  productName?: string;
+  token?: string;
+  link?: string | null;
+};
+
+export type PasswordResetContext = {
+  name?: string;
+  productName?: string;
+  token?: string;
+  link?: string | null;
+};
+
 export type EmailTemplateContextMap = {
   welcome: WelcomeEmailContext;
+  email_confirmation: OtpContext;
+  password_reset: OtpContext;
 };
 
 export type EmailTemplateName = keyof EmailTemplateContextMap;

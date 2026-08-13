@@ -9,6 +9,7 @@ import {
 } from '../entity/invoice_transaction.entity';
 import { InvoiceFeeService } from '../fee/invoice-fee.service';
 import { validateIntent } from '../utils/validate-intent.util';
+import { TransactionSource } from 'src/shared/enum';
 
 @Injectable()
 export class CardInvoicePaymentInitiator implements InvoicePaymentInitiator {
@@ -38,13 +39,14 @@ export class CardInvoicePaymentInitiator implements InvoicePaymentInitiator {
     return this.cardPaymentService.initiateCardPayment(
       {
         amount: feePreview.totalAmount,
-        reference: attempt.invoicePaymentTransactionId,
+        reference: attempt.invoiceTransactionReference,
         email: cardIntent.email,
         cardNumber: cardIntent.cardNumber,
         cardPin: cardIntent.cardPin,
         cvv2: cardIntent.cvv2,
         expiryDate: cardIntent.expiryDate,
         narration: cardIntent.narration,
+        transactionSource: TransactionSource.CHECKOUT_INVOICE,
         feeCharged:
           feePreview.feeBearer === 'customer' ? feePreview.fee : undefined,
       },

@@ -1,10 +1,17 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Country } from 'src/modules/country-and-states/entity/country.entity';
-import { ILike, Repository } from 'typeorm';
+import { ILike, In, Repository } from 'typeorm';
 import { BankDefinition, BankProvider } from '../adapters/banks.adapter';
 import { BanksAdapterFactory } from '../banks-adapter-factory';
 import { Banks } from '../entity/banks.entity';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { ValidateAccountDto } from '../dto/banks.dto';
 
 @Injectable()
 export class BanksService {
@@ -26,12 +33,13 @@ export class BanksService {
     });
 
     return banks.map((bank) => ({
+      bankId: bank.bankId,
       name: bank.name,
       bankCode: bank.bankCode,
     }));
   }
 
-  // @Cron(CronExpression.EVERY_10_MINUTES)
+  // @Cron(CronExpression.EVERY_HOUR)
   async syncBanksFromProvider(): Promise<void> {
     const adapter = this.banksAdapterFactory.getBankAdapter(BankProvider.VFD);
     const providerBanks = await adapter.getBanks();
@@ -76,5 +84,25 @@ export class BanksService {
     await this.banksRepo.save(banks);
 
     this.logger.log(`Synced ${banks.length} banks from ${BankProvider.VFD}`);
+  }
+
+  async validateBankAccount(body: ValidateAccountDto) {
+    const adapter = this.banksAdapterFactory.getBankAdapter(BankProvider.VFD);
+    try {
+      await adapter.validateAccountNumber(body.accountNumber, body.bankCode);
+    } catch (error) {
+      this.logger.error(error);
+      throw new BadRequestException(
+        `We can't complete the request at the moment`,
+      );
+    }
+  }
+
+  async getBanksInId(ids: string[]) {
+    return await this.banksRepo.find({
+      where: {
+        bankId: In(ids),
+      },
+    });
   }
 }

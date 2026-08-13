@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   LedgerEntryDirection,
+  CollectionChannel,
   TransactionRiskStatus,
   TransactionSettlementStatus,
   TransactionSource,
@@ -21,10 +22,12 @@ type TransactionAmount = IntegerAmount;
 export type CreateTransactionInput = {
   businessId: string;
   environment: string;
+  walletId?: string | null;
   expectedAmount: TransactionAmount;
   settledAmount?: TransactionAmount;
   fee?: TransactionAmount;
   source: TransactionSource;
+  collectionChannel?: CollectionChannel | null;
   reference: string;
   remark?: string;
   sourceId?: string | null;
@@ -45,9 +48,11 @@ export type UpdateTransactionInput = Partial<
   Pick<
     CreateTransactionInput,
     | 'expectedAmount'
+    | 'walletId'
     | 'settledAmount'
     | 'fee'
     | 'source'
+    | 'collectionChannel'
     | 'remark'
     | 'sourceId'
     | 'currency'
@@ -124,6 +129,7 @@ export class TransactionService {
     const transaction = repository.create({
       businessId: input.businessId,
       environment: input.environment,
+      walletId: input.walletId ?? null,
       expectedAmount,
       settledAmount: toIntegerAmountString(
         input.settledAmount ?? input.expectedAmount,
@@ -131,6 +137,7 @@ export class TransactionService {
       ),
       fee: toIntegerAmountString(input.fee ?? 0, 'fee'),
       source: input.source,
+      collectionChannel: input.collectionChannel ?? null,
       reference,
       remark: input.remark ?? '',
       sourceId: input.sourceId ?? null,
@@ -326,6 +333,10 @@ export class TransactionService {
       );
     }
 
+    if (input.walletId !== undefined) {
+      payload.walletId = input.walletId;
+    }
+
     if (input.settledAmount !== undefined) {
       payload.settledAmount = toIntegerAmountString(
         input.settledAmount,
@@ -339,6 +350,10 @@ export class TransactionService {
 
     if (input.source !== undefined) {
       payload.source = input.source;
+    }
+
+    if (input.collectionChannel !== undefined) {
+      payload.collectionChannel = input.collectionChannel;
     }
 
     if (input.remark !== undefined) {

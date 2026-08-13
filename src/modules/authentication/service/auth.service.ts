@@ -6,6 +6,8 @@ import { ApiLoginDto, CreateAccountDto, LoginDto } from '../dto/auth.dto';
 import { UserService } from 'src/modules/users/service/user.service';
 import { KeysService } from 'src/modules/key-management/service/keys.service';
 import * as argon from 'argon2';
+import { TokenService } from 'src/modules/token-management/service/token.service';
+import { ActionOwner, TokenNotificationType, TokenType } from 'src/shared/enum';
 
 @Injectable()
 export class AuthService {
@@ -13,16 +15,37 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly userService: UserService,
     private readonly keyService: KeysService,
+    private readonly tokenService: TokenService,
     private readonly config: ConfigService,
   ) {}
 
   async register(dto: CreateAccountDto) {
     try {
       const account = await this.userService.setupNewAccount(dto);
-      return account;
+      const token = this.tokenService.generateNumericToken(6);
+      const saved = await this.tokenService.generateToken({
+        token,
+        ownerId: account.userId,
+        ownerType: ActionOwner.USER,
+        recipientEmail: dto.email?.trim(),
+        notificationType: TokenNotificationType.EMAIL,
+        expiresAt: 60,
+        type: TokenType.EMAIL_VERIFICATION,
+      });
+      return { account, tokenId: saved.tokenId };
     } catch (error: any) {
       throw new BadRequestException(error?.message);
     }
+  }
+
+  async verifyEmailAddress(token: string) {
+    const vToken = await this.tokenService.ValidateToken({
+      token,
+      ownerType: ActionOwner.USER,
+      type: TokenType.EMAIL_VERIFICATION,
+    });
+    const result = await this.userService.verifyEmail(vToken.ownerId);
+    return result;
   }
 
   async dashBoardAccessToken(
@@ -69,6 +92,12 @@ export class AuthService {
       throw new BadRequestException('Account not found');
     }
 
+    if (!account.user.isEmailVerified) {
+      throw new BadRequestException(
+        'Please verify your email address to proceed',
+      );
+    }
+
     const passwordValid = await argon.verify(
       account.user.password,
       dto.password,
@@ -103,4 +132,8 @@ export class AuthService {
 
     return { accessToken };
   }
+
+  async requestPasswordReset() {}
+
+  async resetPassword() {}
 }

@@ -11,6 +11,7 @@ import {
 } from '../dto/business-kyc.dto';
 import { RequestScope } from 'src/shared/business-scope';
 import { BusinessService } from 'src/modules/businesses/service/business.service';
+import { OrganizationType } from 'src/shared/enum';
 
 @Injectable()
 export class BusinessKycService {
@@ -62,6 +63,10 @@ export class BusinessKycService {
     } catch (error) {
       throw new BadRequestException(error.message);
     }
+  }
+
+  async getOrganizationType() {
+    return Object.values(OrganizationType);
   }
 
   async addBusinessRepresentatives(

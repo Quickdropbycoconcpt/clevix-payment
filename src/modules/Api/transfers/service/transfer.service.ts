@@ -1,20 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { TransferAdapterFactory } from '../adapters/transfer.adapter.factory';
 import { TransferProvider } from '../types/transfer-provider';
 import { WalletService } from 'src/modules/wallets/service/wallets.service';
 import { WithdrawalDto } from '../dto/transfer.dto';
 import { RequestScope } from 'src/shared/business-scope';
-import { TransactionSource, TransactionStatus } from 'src/shared/enum';
+import { TransactionSource } from 'src/shared/enum';
 import { AddTransferIntoQue } from '../job/transfer-queue-job';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { TransactionService } from 'src/modules/transactions/service/transaction.service';
 
 @Injectable()
 export class TransferService {
   constructor(
-    private readonly transferAdapterFactory: TransferAdapterFactory,
     private readonly walletService: WalletService,
-    private readonly txnService: TransactionService,
     private readonly transferQueue: AddTransferIntoQue,
   ) {}
 
@@ -34,7 +29,7 @@ export class TransferService {
     /**
      * We determine the provider ourselves
      */
-    await this.walletService.debitUserWallet({
+    const walletTransaction = await this.walletService.debitUserWallet({
       amount,
       environment,
       businessId,
@@ -46,6 +41,7 @@ export class TransferService {
     });
 
     await this.transferQueue.addTransferProcessingQueue({
+      walletTransactionId: walletTransaction.walletTransactionId,
       accountName,
       accountNumber,
       narration,
@@ -58,38 +54,5 @@ export class TransferService {
       reference,
       amount,
     });
-  }
-
-  @Cron(CronExpression.EVERY_10_SECONDS)
-  async transactionStatusQuery() {
-    const BATCH_SIZE = 200;
-    const txns = await this.txnService.getInitiatedOrProcessingTransferTxn({
-      batchSize: BATCH_SIZE,
-    });
-    if (txns.length == 0) {
-      return;
-    }
-
-    for (const txn of txns) {
-      const provider = txn.provider;
-      const adapter = this.transferAdapterFactory.getTransferdapter(provider);
-      const result = await adapter.transactionStatusQuery({
-        environment: txn.environment,
-        reference: txn.reference,
-      });
-      const metadata = result.sessionId
-        ? {
-            ...txn.metadata,
-            sessionId: result.sessionId,
-          }
-        : txn.metadata;
-
-      this.txnService.updateTransactionBySystemReference(result.reference, {
-        executionStatus: result.success
-          ? TransactionStatus.SUCCESS
-          : TransactionStatus.FAILED,
-        metadata,
-      });
-    }
   }
 }

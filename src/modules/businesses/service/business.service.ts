@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -251,6 +252,11 @@ export class BusinessService {
         ? RequestEnvironment.LIVE
         : RequestEnvironment.TEST;
 
+    if (biz.kycStatus != KycStatus.APPROVED) {
+      throw new BadRequestException(
+        `Your Kyc has not been approved. Please contact support`,
+      );
+    }
     await this.businessRepo.update({ businessId }, { environment });
 
     return { businessId, environment };

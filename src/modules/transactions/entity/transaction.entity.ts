@@ -1,17 +1,32 @@
 import { BaseEntity } from 'src/infrastructure/database/base_entiy';
 import {
   LedgerEntryDirection,
+  CollectionChannel,
   TransactionRiskStatus,
   TransactionSettlementStatus,
   TransactionSource,
   TransactionStatus,
 } from 'src/shared/enum';
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { Wallets } from 'src/modules/wallets/entity/wallet.entity';
 
 @Entity('transactions')
 export class Transactions extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   transactionId: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  walletId: string | null;
+
+  @ManyToOne(() => Wallets)
+  @JoinColumn({ name: 'walletId' })
+  wallet: Wallets;
 
   @Column({ type: 'bigint' })
   expectedAmount: string;
@@ -24,6 +39,9 @@ export class Transactions extends BaseEntity {
 
   @Column({ type: 'enum', enum: TransactionSource })
   source: TransactionSource;
+
+  @Column({ type: 'enum', enum: CollectionChannel, nullable: true })
+  collectionChannel: CollectionChannel | null;
 
   @Column({ type: 'varchar', unique: true })
   reference: string;

@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { JobQueueList } from 'src/shared/enum';
 export type TransferQueJobData = {
+  walletTransactionId?: string;
   amount: string;
   bankCode: string;
   merchantReference: string;

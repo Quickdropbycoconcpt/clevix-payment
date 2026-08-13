@@ -3,7 +3,7 @@ import { FeeConfigurationService } from 'src/modules/fees-configuration/service/
 import { CollectionProvider } from 'src/modules/Api/collection/adapters/contracts/collection-adapter.types';
 import { SupportedPaymentMethod } from '../entity/invoice_transaction.entity';
 import { OrganisationInvoice } from '../entity/service_checkout_invoice.entity';
-import { FEE_SOURCE_BY_METHOD } from 'src/shared/constants/invoice.constants';
+import { COLLECTION_CHANNEL_BY_METHOD } from 'src/shared/constants/invoice.constants';
 
 export type InvoiceFeePreview = {
   feeBearer: 'customer' | 'business';
@@ -20,7 +20,7 @@ export class InvoiceFeeService {
     invoice: OrganisationInvoice,
     method: SupportedPaymentMethod,
   ): Promise<InvoiceFeePreview> {
-    const feeSource = FEE_SOURCE_BY_METHOD[method];
+    const feeSource = COLLECTION_CHANNEL_BY_METHOD[method];
 
     if (!feeSource) {
       throw new BadRequestException(`Unsupported payment method: ${method}`);

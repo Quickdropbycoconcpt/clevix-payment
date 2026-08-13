@@ -12,19 +12,19 @@ export class ReconciliationService {
     this.handlers.push(handler);
   }
 
-  async reconcile(merchantRef: string): Promise<void> {
+  async reconcile(merchantRef: string): Promise<boolean> {
     const transaction =
       await this.transactionService.getTransactionByMerchantRef(merchantRef);
 
     if (!transaction) {
-      return;
+      return false;
     }
 
     for (const handler of this.handlers) {
       const handled = await handler.handle(merchantRef, transaction);
 
       if (handled) {
-        return;
+        return true;
       }
     }
   }

@@ -20,6 +20,8 @@ import { InvoiceSettlementAccountResolver } from './reconciliation/invoice-settl
 import { FeesModule } from '../fees-configuration/fees.module';
 import { InvoiceFeeService } from './fee/invoice-fee.service';
 import { SettlementManagementModule } from '../settlement-management/settlement-management.module';
+import { TaxManagementModule } from '../tax-management/tax-management.module';
+import { TaxTransaction } from '../tax-management/entity/tax-transaction.entity';
 
 @Module({
   imports: [
@@ -28,6 +30,7 @@ import { SettlementManagementModule } from '../settlement-management/settlement-
       InvoicePaymentTransaction,
       InvoiceItem,
       Businesses,
+      TaxTransaction,
     ]),
     ServiceCheckoutModule,
     PosModule,
@@ -36,6 +39,7 @@ import { SettlementManagementModule } from '../settlement-management/settlement-
     ReconciliationModule,
     FeesModule,
     SettlementManagementModule,
+    TaxManagementModule,
   ],
   controllers: [ServiceInvoiceCheckoutController],
   providers: [

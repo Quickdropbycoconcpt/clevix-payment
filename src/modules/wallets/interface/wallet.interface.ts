@@ -1,4 +1,4 @@
-import { TransactionSource } from 'src/shared/enum';
+import { CollectionChannel, TransactionSource } from 'src/shared/enum';
 
 export class CreateWalletInterface {
   businessId: string;
@@ -14,6 +14,7 @@ export type CreditWallet = {
   currency: string;
   provider: string;
   source: TransactionSource;
+  collectionChannel?: CollectionChannel | null;
   amount: string;
   reference: string;
   sourceId?: string | null;
@@ -35,6 +36,7 @@ export type DebitWallet = {
   narration: string;
   provider: string;
   source: TransactionSource;
+  collectionChannel?: CollectionChannel | null;
   amount: string;
   reference: string;
   sourceId?: string | null;

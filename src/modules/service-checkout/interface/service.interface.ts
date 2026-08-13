@@ -21,6 +21,7 @@ export type CreateServiceItem = {
   fixedPrice: boolean;
   fixedAmount?: string;
   settlementAccountId: string;
+  taxId?: string | null;
 };
 
 export type CreatePaymentRule = {

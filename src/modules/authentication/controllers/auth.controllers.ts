@@ -1,7 +1,12 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { AuthService } from '../service/auth.service';
 import { ApiTags } from '@nestjs/swagger';
-import { ApiLoginDto, CreateAccountDto, LoginDto } from '../dto/auth.dto';
+import {
+  ApiLoginDto,
+  CreateAccountDto,
+  LoginDto,
+  VerifyEmailDto,
+} from '../dto/auth.dto';
 import { Public } from '../decorators/public.decorator';
 
 @ApiTags('Auth Management')
@@ -19,6 +24,13 @@ export class AuthControllers {
   @Public()
   async apiLogin(@Body() dto: ApiLoginDto) {
     const account = await this.authService.apiLogin(dto);
+    return account;
+  }
+
+  @Post('verify-email')
+  @Public()
+  async verifyEmail(@Body() dto: VerifyEmailDto) {
+    const account = await this.authService.verifyEmailAddress(dto.otp);
     return account;
   }
 

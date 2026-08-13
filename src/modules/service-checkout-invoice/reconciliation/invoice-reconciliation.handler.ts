@@ -11,6 +11,7 @@ import {
   OrganisationInvoice,
 } from '../entity/service_checkout_invoice.entity';
 import { InvoicePaymentTransaction } from '../entity/invoice_transaction.entity';
+import { TaxManagementService } from 'src/modules/tax-management/service/tax-management.service';
 
 @Injectable()
 export class InvoiceReconciliationHandler
@@ -23,6 +24,7 @@ export class InvoiceReconciliationHandler
     private readonly invoiceTxn: Repository<InvoicePaymentTransaction>,
     private readonly webhookService: WebhookService,
     private readonly reconciliationService: ReconciliationService,
+    private readonly taxManagementService: TaxManagementService,
   ) {}
 
   onModuleInit(): void {
@@ -34,7 +36,7 @@ export class InvoiceReconciliationHandler
     transaction: Transactions,
   ): Promise<boolean> {
     const attempt = await this.invoiceTxn.findOne({
-      where: { invoicePaymentTransactionId: merchantRef },
+      where: { invoiceTransactionReference: merchantRef },
       relations: { invoice: true },
     });
 
@@ -51,6 +53,10 @@ export class InvoiceReconciliationHandler
       attempt.invoice.status = InvoiceStatus.PAID;
       attempt.invoice.paidAt = new Date();
       await this.invoiceRepo.save(attempt.invoice);
+      await this.taxManagementService.markInvoiceTaxesCollected(
+        attempt.invoice.invoiceId,
+        transaction.transactionId,
+      );
       await this.webhookService.dispatchWebhook({
         businessId: attempt.invoice.businessId,
         environment: attempt.invoice.environment,

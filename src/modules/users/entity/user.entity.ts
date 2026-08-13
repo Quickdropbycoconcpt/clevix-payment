@@ -11,6 +11,12 @@ export class User {
   @Column({ type: 'varchar' })
   lastName: string;
 
+  @Column({ type: 'boolean', default: false })
+  isEmailVerified: boolean;
+
+  @Column({ type: 'boolean', default: false })
+  isPhoneVerified: boolean;
+
   @Column({ type: 'uuid', nullable: true })
   activeBusinessId: string;
 
@@ -23,7 +29,7 @@ export class User {
   @Column({ type: 'varchar' })
   dialCode: string;
 
-  @Column({ type: 'varchar' })
+  @Column({ type: 'varchar', select: false })
   password: string;
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
@@ -36,6 +42,6 @@ export class User {
   })
   updatedAt: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamp', nullable: true, select: false })
   deleteAt: Date;
 }

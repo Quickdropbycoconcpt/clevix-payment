@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { User } from '../entity/user.entity';
@@ -14,6 +15,7 @@ import { WalletService } from 'src/modules/wallets/service/wallets.service';
 import { BusinessMembersService } from 'src/modules/business-members/service/business-members.service';
 import { CountryService } from 'src/modules/country-and-states/service/country.service';
 import { BusinessRolesService } from 'src/modules/business-members/service/business-roles.service';
+import { UserDto } from '../dto/user.dto';
 
 @Injectable()
 export class UserService {
@@ -111,6 +113,7 @@ export class UserService {
   async dashBoardAuthentication(email: string) {
     const user = await this.userRepo.findOne({
       where: { email: email.toLowerCase().trim() },
+      select: { password: true, userId: true },
     });
 
     if (!user) {
@@ -160,5 +163,61 @@ export class UserService {
       this.logger.error(error);
       throw new BadRequestException('Something went wrong');
     }
+  }
+
+  async profile(userId: string) {
+    try {
+      const profile = await this.userRepo.findOne({ where: { userId } });
+      return { profile };
+    } catch (error) {
+      this.logger.error(error);
+      throw new BadRequestException('Something went wrong');
+    }
+  }
+
+  async changePassword(userId: string | undefined, input: UserDto) {
+    if (!userId) {
+      throw new UnauthorizedException('Invalid request user');
+    }
+
+    const user = await this.userRepo.findOne({
+      where: { userId },
+      select: {
+        userId: true,
+        password: true,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Account not found');
+    }
+
+    const oldPasswordValid = await argon.verify(
+      user.password,
+      input.oldPassword,
+    );
+
+    if (!oldPasswordValid) {
+      throw new BadRequestException('Your previous password is incorrect');
+    }
+
+    const samePassword = await argon.verify(user.password, input.newPassword);
+
+    if (samePassword) {
+      throw new BadRequestException(
+        'New password cannot be the same as old password',
+      );
+    }
+
+    await this.userRepo.update(
+      { userId },
+      { password: await argon.hash(input.newPassword) },
+    );
+
+    return { message: 'Password changed successfully' };
+  }
+
+  async verifyEmail(userId: string) {
+    return await this.userRepo.update({ userId }, { isEmailVerified: true });
   }
 }

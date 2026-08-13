@@ -7,6 +7,7 @@ import { OrganisationPaymentRules } from './entity/service_payment_rules.entity'
 import { ServiceItems } from './entity/service_items.entity';
 import { ServiceCheckout } from './service/service-checkout.service';
 import { ServiceCheckoutController } from './controller/service-checkout.controller';
+import { SettlementBankAccounts } from '../settlement-management/entity/settlement_accounts.entity';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ServiceCheckoutController } from './controller/service-checkout.control
       OrganisationFormOption,
       OrganisationPaymentRules,
       ServiceItems,
+      SettlementBankAccounts,
     ]),
   ],
   controllers: [ServiceCheckoutController],

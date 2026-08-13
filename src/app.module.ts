@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './infrastructure/database/database.module';
@@ -23,6 +24,10 @@ import { CardPaymentModule } from './modules/Api/collection/card/card-payment-mo
 import { BanksModule } from './modules/Api/banks/banks.module';
 import { DashboardBanksModule } from './modules/banks/banks.module';
 import { BusinessKycModule } from './modules/business-kyc/business-kyc.module';
+import { TaxManagementModule } from './modules/tax-management/tax-management.module';
+import { FeatureManagementModule } from './modules/admin-management/feature-management/feature-management.module';
+import { PaginationInterceptor } from './shared/http/pagination.interceptor';
+import { TokenModule } from './modules/token-management/token.module';
 
 @Module({
   imports: [
@@ -61,8 +66,17 @@ import { BusinessKycModule } from './modules/business-kyc/business-kyc.module';
     CardPaymentModule,
     BanksModule,
     DashboardBanksModule,
+    TaxManagementModule,
+    FeatureManagementModule,
+    TokenModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: PaginationInterceptor,
+    },
+  ],
 })
 export class AppModule {}

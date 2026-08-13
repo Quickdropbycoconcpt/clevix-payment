@@ -61,6 +61,13 @@ export class CreateServiceItemDto {
   @IsString()
   @IsNotEmpty()
   settlementAccountId: string;
+
+  @ApiPropertyOptional({
+    description: 'Platform tax configuration to apply to this item.',
+  })
+  @IsOptional()
+  @IsString()
+  taxId?: string | null;
 }
 
 export class CreateFormOptionDto {

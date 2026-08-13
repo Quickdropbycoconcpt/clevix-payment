@@ -79,6 +79,12 @@ export class LoginDto {
   password: string;
 }
 
+export class VerifyEmailDto {
+  @IsString()
+  @IsNotEmpty()
+  otp: string;
+}
+
 export class ApiLoginDto {
   @ApiProperty({ example: '3465789' })
   @IsString()

@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from 'src/modules/authentication/decorators/current-user.decorator';
 import type { RequestScope } from 'src/shared/business-scope';
@@ -50,5 +50,10 @@ export class BusinessKycController {
       scope,
     );
     return doc;
+  }
+
+  @Get('organization-type')
+  async getOrgType() {
+    return this.businessKycService.getOrganizationType();
   }
 }

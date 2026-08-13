@@ -9,9 +9,12 @@ import { AddTransferIntoQue } from './job/transfer-queue-job';
 import { BullModule } from '@nestjs/bullmq';
 import { JobQueueList } from 'src/shared/enum';
 import { TransferJobProccessor } from './job/transfer-payout-proccessor';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { WalletTransactions } from 'src/modules/wallets/entity/wallet_transactions.entity';
 
 @Module({
   imports: [
+    TypeOrmModule.forFeature([WalletTransactions]),
     WalletModule,
     TransactionModule,
     VfdModule,

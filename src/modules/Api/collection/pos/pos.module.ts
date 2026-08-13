@@ -4,6 +4,7 @@ import { VfdModule } from 'src/infrastructure/payments/providers/vfd/vfd.module'
 import { BusinessModule } from 'src/modules/businesses/business.module';
 import { TransactionModule } from 'src/modules/transactions/transactions.module';
 import { WalletModule } from 'src/modules/wallets/wallets.module';
+import { SettlementManagementModule } from 'src/modules/settlement-management/settlement-management.module';
 import { CollectionAdapterFactory } from '../adapters/collection.adapter.factory';
 import { PosController } from './controllers/pos.controllers';
 import { PosTransactions } from './entity/pos_transactions.entity';
@@ -18,6 +19,7 @@ import { PosTerminalService } from './service/pos_terminal.service';
     WalletModule,
     TransactionModule,
     BusinessModule,
+    SettlementManagementModule,
   ],
   controllers: [PosController],
   providers: [CollectionAdapterFactory, PosService, PosTerminalService],

@@ -56,7 +56,7 @@ export class EmailService {
   }
 
   async sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
-    return this.sendEmail(input);
+    return this.getEmailTransporter(input);
   }
 
   async sendTemplateEmail<TemplateName extends EmailTemplateName>(

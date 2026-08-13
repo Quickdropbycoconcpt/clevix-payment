@@ -13,8 +13,10 @@ import { JwtAuthGuard } from 'src/modules/authentication/guards/jwt-auth.guard';
 import type { JwtPayload } from 'src/modules/authentication/interface/jwt-payload.interface';
 import { Public } from 'src/modules/authentication/decorators/public.decorator';
 import { getBusinessScope } from 'src/shared/business-scope';
+import type { RequestScope } from 'src/shared/business-scope';
 import { CreateServiceDto } from '../dto/create-service.dto';
 import { ServiceCheckout } from '../service/service-checkout.service';
+import { BusinessDashboardAuth } from 'src/modules/authentication/decorators/business-dashboard-auth.decorator';
 
 @ApiTags('SERVICE CHECKOUT')
 @Controller('service-checkout')
@@ -49,17 +51,26 @@ export class ServiceCheckoutController {
   }
 
   @Post('services')
-  @UseGuards(JwtAuthGuard)
+  @BusinessDashboardAuth()
   async createService(
     @Body() dto: CreateServiceDto,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: RequestScope,
   ) {
     const { businessId, environment } = getBusinessScope(user);
-
     return this.serviceCheckout.createService({
       ...dto,
       businessId,
       environment,
     });
+  }
+
+  @Get('services')
+  @BusinessDashboardAuth()
+  async getService(
+    @CurrentUser() user: RequestScope,
+    @Query('name') name: string,
+  ) {
+    const scope = getBusinessScope(user);
+    return this.serviceCheckout.listServices(scope, name);
   }
 }

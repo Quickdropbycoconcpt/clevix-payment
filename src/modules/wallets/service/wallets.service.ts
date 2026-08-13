@@ -10,11 +10,16 @@ import { EntityManager, Repository } from 'typeorm';
 import { JwtPayload } from 'src/modules/authentication/interface/jwt-payload.interface';
 import { businessScopeFilter } from 'src/shared/business-scope';
 import {
+  CollectionChannel,
   LedgerEntryDirection,
   RequestEnvironment,
   TransactionRiskStatus,
   TransactionSettlementStatus,
+  TransactionSource,
   TransactionStatus,
+  WalletTransactionSource,
+  WalletTransactionStatus,
+  WalletTransactionType,
 } from 'src/shared/enum';
 import { LedgerService } from 'src/modules/ledger/service/ledger.service';
 import {
@@ -26,16 +31,15 @@ import { Transactions } from 'src/modules/transactions/entity/transaction.entity
 import { FeeConfigurationService } from 'src/modules/fees-configuration/service/fees_revenue.service';
 import { TransactionFeesService } from 'src/modules/transaction_fees/service/transaction_fees.service';
 import { WebhookService } from 'src/modules/webhooks/service/webhook.service';
-import { BusinessSettlementConfigurationService } from 'src/modules/settlement-management/service/settlement_business_config.service';
-import {
-  BusinessSettlementType,
-  SettlementLocation,
-} from 'src/modules/settlement-management/entity/business_settlement_config.entity';
-import { TRANSACTION_SOURCE_TO_PAYMENT_SOURCE } from 'src/shared/constants/settlement.constants';
-import { SettlementAccountResolutionService } from 'src/modules/settlement-management/service/settlement-account-resolution.service';
-import { allocateSettlementShares } from 'src/shared/utils';
-import { SettlementTransactionsService } from 'src/modules/settlement-management/service/settlement-transactions.service';
-import { SettlementService } from 'src/modules/settlement-management/service/settlement.account.service';
+import { WalletTransactions } from '../entity/wallet_transactions.entity';
+
+type CreditWalletAmounts = {
+  totalAmount: bigint;
+  settledAmount: bigint;
+  netAmount: bigint;
+  providerFee: bigint;
+  merchantFee: bigint;
+};
 
 @Injectable()
 export class WalletService {
@@ -44,21 +48,18 @@ export class WalletService {
   constructor(
     @InjectRepository(Wallets)
     private readonly walletRepo: Repository<Wallets>,
+    @InjectRepository(WalletTransactions)
+    private readonly walletTransactionRepo: Repository<WalletTransactions>,
     private readonly txnService: TransactionService,
     private readonly ledgerService: LedgerService,
     private readonly txnFee: TransactionFeesService,
     private readonly feeConfigService: FeeConfigurationService,
     private readonly webhookService: WebhookService,
-    private readonly settlementConfigService: BusinessSettlementConfigurationService,
-    private readonly settlementAccountResolutionService: SettlementAccountResolutionService,
-    private readonly settlementTransactionsService: SettlementTransactionsService,
-    private readonly settlementService: SettlementService,
   ) {}
 
   async creditUserWallet(input: CreditWallet) {
     try {
-      const { reference, environment, amount, businessId, currency, provider } =
-        input;
+      const { reference, amount, businessId, provider } = input;
       /**
        * Keyed off the merchant reference (not our own `reference`) because
        * callers like the POS charge flow mint a fresh internal reference on
@@ -66,14 +67,21 @@ export class WalletService {
        * retry.
        */
       const dedupeReference = input.merchantReference ?? reference;
+      const feeSource = this.getFeeSource(
+        input.source,
+        input.collectionChannel,
+      );
       const { providerFee, chargedFee: merchantFee } =
         await this.feeConfigService.getFeeBySource(
-          input.source,
+          feeSource,
           businessId,
           provider,
           amount,
           input.feeCharged
-            ? { feature: input.source, feeCollected: input.feeCharged }
+            ? {
+                feature: feeSource,
+                feeCollected: input.feeCharged,
+              }
             : undefined,
         );
       const totalAmount = BigInt(amount);
@@ -85,344 +93,19 @@ export class WalletService {
       }
 
       const result = await this.walletRepo.manager.transaction(
-        async (entityManager) => {
-          /**
-           * Lock the wallet row before doing anything else. Concurrent
-           * credits to the same wallet (duplicate webhook delivery, a
-           * retried request, etc.) serialize on this lock instead of
-           * racing a read-modify-write on `balance` or both slipping past
-           * the idempotency check below.
-           */
-          const wallet = await this.findOrCreateWallet(
-            { currency, businessId },
-            { environment, businessId, userId: '' },
-            entityManager,
-            { lock: true },
-          );
-
-          if (!wallet) {
-            throw new BadRequestException('Wallet creation failed');
-          }
-
-          const isProcessed = await this.txnService.getSuccessfulTransaction(
+        async (entityManager) =>
+          this.processWalletCredit(
+            input,
+            {
+              totalAmount,
+              settledAmount,
+              netAmount,
+              providerFee,
+              merchantFee,
+            },
             dedupeReference,
             entityManager,
-          );
-
-          if (isProcessed) {
-            this.logger.warn(
-              `Skipping duplicate wallet credit for merchantReference=${dedupeReference}, businessId=${businessId}`,
-            );
-            return isProcessed;
-          }
-
-          const businessLedgerAccount =
-            await this.ledgerService.findOrCreateLedgerAccount(
-              {
-                ownerId: businessId,
-                ownerType: LedgerAccountOwnerType.BUSINESS,
-                accountType: LedgerAccountType.CUSTOMER_CASH,
-                currency,
-                environment,
-              },
-              entityManager,
-            );
-
-          const providerLedger =
-            await this.ledgerService.findOrCreateLedgerAccount(
-              {
-                ownerId: provider,
-                ownerType: LedgerAccountOwnerType.PROVIDER,
-                accountType: LedgerAccountType.PROVIDER_SETTLEMENT,
-                currency,
-                environment,
-              },
-              entityManager,
-            );
-
-          const revenueLedger =
-            await this.ledgerService.findOrCreateLedgerAccount(
-              {
-                ownerId: 'clevix-revenue',
-                ownerType: LedgerAccountOwnerType.SYSTEM,
-                accountType: LedgerAccountType.FEES_REVENUE,
-                currency,
-                environment,
-              },
-              entityManager,
-            );
-
-          const providerFeeExpenseLedger =
-            await this.ledgerService.findOrCreateLedgerAccount(
-              {
-                ownerId: `${provider}-fee`,
-                ownerType: LedgerAccountOwnerType.PROVIDER,
-                accountType: LedgerAccountType.PROVIDER_FEE_EXPENSE,
-                currency,
-                environment,
-              },
-              entityManager,
-            );
-
-          await this.ledgerService.ledgerPosting(
-            {
-              reference,
-              environment,
-              businessId: input.businessId,
-              transactionType: input.source,
-              amount,
-              currency: input.currency,
-              entries: [
-                {
-                  ledgerAccountId: providerLedger.ledgerAccountId,
-                  direction: LedgerEntryDirection.DEBIT,
-                  amount: settledAmount.toString(),
-                  memo: 'Provider settlement receivable',
-                },
-                {
-                  ledgerAccountId: providerFeeExpenseLedger.ledgerAccountId,
-                  direction: LedgerEntryDirection.DEBIT,
-                  amount: providerFee.toString(),
-                  memo: 'Provider collection fee',
-                },
-                {
-                  ledgerAccountId: businessLedgerAccount.ledgerAccountId,
-                  direction: LedgerEntryDirection.CREDIT,
-                  amount: netAmount.toString(),
-                  memo: 'Business wallet credit',
-                },
-                {
-                  ledgerAccountId: revenueLedger.ledgerAccountId,
-                  direction: LedgerEntryDirection.CREDIT,
-                  amount: merchantFee.toString(),
-                  memo: 'Platform collection fee revenue',
-                },
-              ],
-            },
-            entityManager,
-          );
-          const paymentSource =
-            TRANSACTION_SOURCE_TO_PAYMENT_SOURCE[input.source];
-
-          const settlementConfig = paymentSource
-            ? await this.settlementConfigService.getConfig(
-                { businessId, environment },
-                paymentSource,
-              )
-            : null;
-
-          /**
-           * Ask feature resolvers (invoice, etc.) whether this reference is
-           * attached to anything with its own settlement routing. Safe to
-           * call unconditionally — resolve() is a no-op returning
-           * `undefined` when nothing claims the reference, e.g. a plain
-           * POS/virtual-account credit with no invoice behind it. Each
-           * allocation carries a (possibly null) account and its share of
-           * the gross amount, since one invoice can legitimately route
-           * different items to different settlement accounts.
-           */
-          const allocations =
-            await this.settlementAccountResolutionService.resolve(
-              dedupeReference,
-            );
-
-          /**
-           * A real (non-null) account override always forces deferral — it
-           * can never be instant, since routing to a specific bank account
-           * is never "instant" the way crediting the wallet is.
-           */
-          const hasAccountOverride = (allocations ?? []).some(
-            (allocation) => allocation.settlementBankAccountId !== null,
-          );
-
-          /**
-           * No config, or explicitly INSTANT (which the DB constraint
-           * guarantees only ever pairs with WALLET) both mean: credit the
-           * spendable balance right now, same as before settlement
-           * routing existed — unless a specific account override says
-           * otherwise.
-           */
-          const shouldCreditWalletNow =
-            !hasAccountOverride &&
-            (!settlementConfig ||
-              settlementConfig.settlementType ===
-                BusinessSettlementType.INSTANT);
-
-          if (shouldCreditWalletNow) {
-            await entityManager
-              .createQueryBuilder()
-              .update(Wallets)
-              .set({ balance: () => 'balance + :amount' })
-              .where('walletId = :walletId', { walletId: wallet.walletId })
-              .setParameter('amount', netAmount.toString())
-              .execute();
-          } else {
-            /**
-             * T+1 (WALLET or BANK), or a specific account override: don't
-             * touch the spendable balance yet. The nightly settlement job
-             * is what eventually credits it (T+1+WALLET) or pays out to
-             * the bank (T+1+BANK / override account).
-             */
-            if (!paymentSource) {
-              throw new BadRequestException(
-                `Cannot defer settlement for unmapped transaction source: ${input.source}`,
-              );
-            }
-
-            const settlementType =
-              settlementConfig?.settlementType ??
-              BusinessSettlementType.T_PLUS_1;
-
-            /**
-             * No allocations at all means nothing claimed this reference —
-             * one implicit bucket for the whole credit, routed by general
-             * config alone. When the business bears the fee, this needs to
-             * be `totalAmount` (gross) since allocateSettlementShares
-             * subtracts the fee below; when the customer already covered
-             * it, there's nothing left to subtract, so it needs to already
-             * be `netAmount` — otherwise the bucket would include the fee
-             * on top of what the business is actually owed.
-             */
-            const effectiveAllocations = allocations?.length
-              ? allocations
-              : [
-                  {
-                    settlementBankAccountId: null,
-                    grossAmount: (input.feeCharged
-                      ? netAmount
-                      : totalAmount
-                    ).toString(),
-                  },
-                ];
-
-            const shares = allocateSettlementShares(
-              effectiveAllocations,
-              Boolean(input.feeCharged),
-              merchantFee,
-            );
-
-            for (const { settlementBankAccountId, amount } of shares) {
-              if (amount <= 0n) {
-                continue;
-              }
-
-              let resolvedAccountId = settlementBankAccountId;
-
-              if (
-                !resolvedAccountId &&
-                settlementConfig?.settlementLocation === SettlementLocation.BANK
-              ) {
-                /**
-                 * No primary account configured yet doesn't block the
-                 * credit — the bucket still accumulates with a null
-                 * account and just sits unsettled until the business adds
-                 * one. Nothing to route to right now isn't the same as
-                 * nothing to track.
-                 */
-                const primaryAccount =
-                  await this.settlementService.getPrimaryAccount(
-                    businessId,
-                    environment,
-                  );
-
-                resolvedAccountId = primaryAccount?.bankAccountId ?? null;
-              }
-
-              await this.settlementTransactionsService.upsertUnsettledBucket(
-                {
-                  businessId,
-                  environment,
-                  paymentSource,
-                  settlementType,
-                  settlementBankAccountId: resolvedAccountId,
-                  amount,
-                },
-                entityManager,
-              );
-            }
-          }
-
-          const isTransaction =
-            await this.txnService.getTransactionBySystemReference(
-              input.reference,
-              entityManager,
-            );
-          const transactionMetadata = {
-            ...isTransaction?.metadata,
-            ...input.metadata,
-            grossAmount: totalAmount.toString(),
-            settledAmount: netAmount.toString(),
-            merchantFee: merchantFee.toString(),
-            providerFee: providerFee.toString(),
-          };
-
-          let transaction: Transactions;
-
-          if (isTransaction) {
-            transaction =
-              await this.txnService.updateTransactionBySystemReference(
-                input.reference,
-                {
-                  settledAmount: netAmount.toString(),
-                  fee: merchantFee.toString(),
-                  executionStatus: TransactionStatus.SUCCESS,
-                  settlementStatus: shouldCreditWalletNow
-                    ? TransactionSettlementStatus.SETTLED
-                    : TransactionSettlementStatus.UNSETTLED,
-                  riskStatus: TransactionRiskStatus.CLEAR,
-                  merchantReference:
-                    input.merchantReference ?? isTransaction.merchantReference,
-                  providerReference: input.providerReference ?? input.reference,
-                  sourceId: input.sourceId ?? isTransaction.sourceId,
-                  metadata: transactionMetadata,
-                  remark: 'Inward credit completed',
-                },
-                entityManager,
-              );
-          } else {
-            transaction = await this.txnService.createTransaction(
-              {
-                businessId,
-                environment,
-                expectedAmount: totalAmount.toString(),
-                settledAmount: netAmount.toString(),
-                fee: merchantFee.toString(),
-                source: input.source,
-                reference: input.reference,
-                remark: 'Wallet credit completed',
-                sourceId: input.sourceId ?? null,
-                currency,
-                provider,
-                executionStatus: TransactionStatus.SUCCESS,
-                merchantReference: input.merchantReference ?? input.reference,
-                providerReference: input.providerReference ?? input.reference,
-                settlementStatus: shouldCreditWalletNow
-                  ? TransactionSettlementStatus.SETTLED
-                  : TransactionSettlementStatus.UNSETTLED,
-                riskStatus: TransactionRiskStatus.CLEAR,
-                direction: LedgerEntryDirection.CREDIT,
-                idempotencyKey: `wallet-credit:${businessId}:${input.reference}`,
-                metadata: transactionMetadata,
-              },
-              entityManager,
-            );
-          }
-
-          await this.txnFee.recordTransactionFee(
-            {
-              transactionId: transaction.transactionId,
-              businessId,
-              provider,
-              feeSource: input.source,
-              grossAmount: totalAmount,
-              chargedFee: merchantFee,
-              providerFee,
-            },
-            entityManager,
-          );
-
-          return transaction;
-        },
+          ),
       );
 
       return result;
@@ -433,6 +116,303 @@ export class WalletService {
       );
       throw error;
     }
+  }
+
+  private async processWalletCredit(
+    input: CreditWallet,
+    amounts: CreditWalletAmounts,
+    dedupeReference: string,
+    entityManager: EntityManager,
+  ) {
+    const wallet = await this.getLockedCreditWallet(input, entityManager);
+    const processed = await this.getProcessedCreditTransaction(
+      dedupeReference,
+      input.businessId,
+      entityManager,
+    );
+
+    if (processed) {
+      return processed;
+    }
+
+    await this.postCreditLedger(input, amounts, entityManager);
+
+    const transaction = await this.saveCreditTransaction(
+      input,
+      wallet,
+      amounts,
+      true,
+      entityManager,
+    );
+
+    await this.creditSpendableWalletBalance(
+      wallet.walletId,
+      amounts.netAmount,
+      entityManager,
+    );
+    await this.recordCreditTransactionFee(
+      input,
+      transaction,
+      amounts,
+      entityManager,
+    );
+
+    return transaction;
+  }
+
+  private async getLockedCreditWallet(
+    input: CreditWallet,
+    entityManager: EntityManager,
+  ) {
+    /**
+     * Lock the wallet row before doing anything else. Concurrent credits to
+     * the same wallet serialize on this lock instead of racing balance
+     * updates or idempotency checks.
+     */
+    const wallet = await this.findOrCreateWallet(
+      { currency: input.currency, businessId: input.businessId },
+      {
+        environment: input.environment,
+        businessId: input.businessId,
+        userId: '',
+      },
+      entityManager,
+      { lock: true },
+    );
+
+    if (!wallet) {
+      throw new BadRequestException('Wallet creation failed');
+    }
+
+    return wallet;
+  }
+
+  private async getProcessedCreditTransaction(
+    dedupeReference: string,
+    businessId: string,
+    entityManager: EntityManager,
+  ) {
+    const processed = await this.txnService.getSuccessfulTransaction(
+      dedupeReference,
+      entityManager,
+    );
+
+    if (processed) {
+      this.logger.warn(
+        `Skipping duplicate wallet credit for merchantReference=${dedupeReference}, businessId=${businessId}`,
+      );
+    }
+
+    return processed;
+  }
+
+  private async postCreditLedger(
+    input: CreditWallet,
+    amounts: CreditWalletAmounts,
+    entityManager: EntityManager,
+  ) {
+    const businessLedgerAccount =
+      await this.ledgerService.findOrCreateLedgerAccount(
+        {
+          ownerId: input.businessId,
+          ownerType: LedgerAccountOwnerType.BUSINESS,
+          accountType: LedgerAccountType.CUSTOMER_CASH,
+          currency: input.currency,
+          environment: input.environment,
+        },
+        entityManager,
+      );
+    const providerLedger = await this.ledgerService.findOrCreateLedgerAccount(
+      {
+        ownerId: input.provider,
+        ownerType: LedgerAccountOwnerType.PROVIDER,
+        accountType: LedgerAccountType.PROVIDER_SETTLEMENT,
+        currency: input.currency,
+        environment: input.environment,
+      },
+      entityManager,
+    );
+    const revenueLedger = await this.ledgerService.findOrCreateLedgerAccount(
+      {
+        ownerId: 'clevix-revenue',
+        ownerType: LedgerAccountOwnerType.SYSTEM,
+        accountType: LedgerAccountType.FEES_REVENUE,
+        currency: input.currency,
+        environment: input.environment,
+      },
+      entityManager,
+    );
+    const providerFeeExpenseLedger =
+      await this.ledgerService.findOrCreateLedgerAccount(
+        {
+          ownerId: `${input.provider}-fee`,
+          ownerType: LedgerAccountOwnerType.PROVIDER,
+          accountType: LedgerAccountType.PROVIDER_FEE_EXPENSE,
+          currency: input.currency,
+          environment: input.environment,
+        },
+        entityManager,
+      );
+
+    await this.ledgerService.ledgerPosting(
+      {
+        reference: input.reference,
+        environment: input.environment,
+        businessId: input.businessId,
+        transactionType: input.source,
+        amount: input.amount,
+        currency: input.currency,
+        entries: [
+          {
+            ledgerAccountId: providerLedger.ledgerAccountId,
+            direction: LedgerEntryDirection.DEBIT,
+            amount: amounts.settledAmount.toString(),
+            memo: 'Provider settlement receivable',
+          },
+          {
+            ledgerAccountId: providerFeeExpenseLedger.ledgerAccountId,
+            direction: LedgerEntryDirection.DEBIT,
+            amount: amounts.providerFee.toString(),
+            memo: 'Provider collection fee',
+          },
+          {
+            ledgerAccountId: businessLedgerAccount.ledgerAccountId,
+            direction: LedgerEntryDirection.CREDIT,
+            amount: amounts.netAmount.toString(),
+            memo: 'Business wallet credit',
+          },
+          {
+            ledgerAccountId: revenueLedger.ledgerAccountId,
+            direction: LedgerEntryDirection.CREDIT,
+            amount: amounts.merchantFee.toString(),
+            memo: 'Platform collection fee revenue',
+          },
+        ],
+      },
+      entityManager,
+    );
+  }
+
+  private getFeeSource(
+    source: TransactionSource,
+    collectionChannel?: CollectionChannel | null,
+  ) {
+    return collectionChannel ?? source;
+  }
+
+  private async saveCreditTransaction(
+    input: CreditWallet,
+    wallet: Wallets,
+    amounts: CreditWalletAmounts,
+    shouldCreditWalletNow: boolean,
+    entityManager: EntityManager,
+  ) {
+    const existingTransaction =
+      await this.txnService.getTransactionBySystemReference(
+        input.reference,
+        entityManager,
+      );
+    const metadata = {
+      ...existingTransaction?.metadata,
+      ...input.metadata,
+      grossAmount: amounts.totalAmount.toString(),
+      settledAmount: amounts.netAmount.toString(),
+      merchantFee: amounts.merchantFee.toString(),
+      providerFee: amounts.providerFee.toString(),
+    };
+
+    if (existingTransaction) {
+      return this.txnService.updateTransactionBySystemReference(
+        input.reference,
+        {
+          settledAmount: amounts.netAmount.toString(),
+          fee: amounts.merchantFee.toString(),
+          walletId: wallet.walletId,
+          collectionChannel: input.collectionChannel ?? null,
+          executionStatus: TransactionStatus.SUCCESS,
+          settlementStatus: this.getTransactionSettlementStatus(
+            shouldCreditWalletNow,
+          ),
+          riskStatus: TransactionRiskStatus.CLEAR,
+          merchantReference:
+            input.merchantReference ?? existingTransaction.merchantReference,
+          providerReference: input.providerReference ?? input.reference,
+          sourceId: input.sourceId ?? existingTransaction.sourceId,
+          metadata,
+          remark: 'Inward credit completed',
+        },
+        entityManager,
+      );
+    }
+
+    return this.txnService.createTransaction(
+      {
+        businessId: input.businessId,
+        environment: input.environment,
+        walletId: wallet.walletId,
+        expectedAmount: amounts.totalAmount.toString(),
+        settledAmount: amounts.netAmount.toString(),
+        fee: amounts.merchantFee.toString(),
+        source: input.source,
+        collectionChannel: input.collectionChannel ?? null,
+        reference: input.reference,
+        remark: 'Wallet credit completed',
+        sourceId: input.sourceId ?? null,
+        currency: input.currency,
+        provider: input.provider,
+        executionStatus: TransactionStatus.SUCCESS,
+        merchantReference: input.merchantReference ?? input.reference,
+        providerReference: input.providerReference ?? input.reference,
+        settlementStatus: this.getTransactionSettlementStatus(
+          shouldCreditWalletNow,
+        ),
+        riskStatus: TransactionRiskStatus.CLEAR,
+        direction: LedgerEntryDirection.CREDIT,
+        idempotencyKey: `wallet-credit:${input.businessId}:${input.reference}`,
+        metadata,
+      },
+      entityManager,
+    );
+  }
+
+  private getTransactionSettlementStatus(shouldCreditWalletNow: boolean) {
+    return shouldCreditWalletNow
+      ? TransactionSettlementStatus.SETTLED
+      : TransactionSettlementStatus.UNSETTLED;
+  }
+
+  private async creditSpendableWalletBalance(
+    walletId: string,
+    amount: bigint,
+    entityManager: EntityManager,
+  ) {
+    await entityManager
+      .createQueryBuilder()
+      .update(Wallets)
+      .set({ balance: () => 'balance + :amount' })
+      .where('walletId = :walletId', { walletId })
+      .setParameter('amount', amount.toString())
+      .execute();
+  }
+
+  private async recordCreditTransactionFee(
+    input: CreditWallet,
+    transaction: Transactions,
+    amounts: CreditWalletAmounts,
+    entityManager: EntityManager,
+  ) {
+    await this.txnFee.recordTransactionFee(
+      {
+        transactionId: transaction.transactionId,
+        businessId: input.businessId,
+        provider: input.provider,
+        feeSource: this.getFeeSource(input.source, input.collectionChannel),
+        grossAmount: amounts.totalAmount,
+        chargedFee: amounts.merchantFee,
+        providerFee: amounts.providerFee,
+      },
+      entityManager,
+    );
   }
 
   async dispatchCreditWebhook(
@@ -449,7 +429,7 @@ export class WalletService {
         businessId: input.businessId,
         environment: input.environment,
         transactionId,
-        type: input.source,
+        type: input.collectionChannel ?? input.source,
         payload,
       });
     } catch (error) {
@@ -473,9 +453,10 @@ export class WalletService {
       throw new BadRequestException('Amount can not be negative');
     }
 
-    const duplicateTxn = await this.txnService.getTransactionByMerchantRef(
-      input.reference,
-    );
+    const walletDebitIdempotencyKey = `wallet-debit:${businessId}:${input.reference}`;
+    const duplicateTxn = await this.walletTransactionRepo.findOne({
+      where: { idempotencyKey: walletDebitIdempotencyKey },
+    });
 
     if (duplicateTxn) {
       throw new BadRequestException('Transaction with reference exist');
@@ -495,16 +476,42 @@ export class WalletService {
     /**
      * Avoid double spend by using database lock.
      */
-    await this.walletRepo.manager.transaction(async (entityManager) => {
+    return this.walletRepo.manager.transaction(async (entityManager) => {
+      const wallet = await this.findOrCreateWallet(
+        { currency, businessId },
+        { environment, businessId, userId: '' },
+        entityManager,
+        { lock: true },
+      );
+
+      if (!wallet) {
+        throw new BadRequestException('Wallet not found');
+      }
+
+      const walletTransactionRepo =
+        entityManager.getRepository(WalletTransactions);
+      const existingWalletTransaction = await walletTransactionRepo.findOne({
+        where: { idempotencyKey: walletDebitIdempotencyKey },
+      });
+
+      if (existingWalletTransaction) {
+        throw new BadRequestException('Transaction with reference exist');
+      }
+
+      const availableBalanceBefore = BigInt(wallet.balance);
+      const availableBalanceAfter = availableBalanceBefore - totalMerchantDebit;
+
+      if (availableBalanceAfter < 0n) {
+        throw new BadRequestException('Your balance is currently low');
+      }
+
       const result = await entityManager
         .createQueryBuilder()
         .update(Wallets)
         .set({
           balance: () => 'balance - :amount',
         })
-        .where('businessId = :businessId', { businessId })
-        .andWhere('currency = :currency', { currency })
-        .andWhere('environment = :environment', { environment })
+        .where('walletId = :walletId', { walletId: wallet.walletId })
         .andWhere('balance >= :amount', { amount: totalMerchantDebit })
         .setParameter('amount', totalMerchantDebit)
         .execute();
@@ -589,32 +596,35 @@ export class WalletService {
         },
         entityManager,
       );
-      const transaction = await this.txnService.createTransaction(
-        {
+      return walletTransactionRepo.save(
+        walletTransactionRepo.create({
           businessId,
           environment,
-          expectedAmount: grossPayoutAmount.toString(),
-          settledAmount: grossPayoutAmount.toString(),
-          fee: merchantFee.toString(),
-          source: input.source,
+          walletId: wallet.walletId,
           reference: input.reference,
-          remark: input.narration ?? 'Naira payout',
-          sourceId: input.sourceId ?? null,
-          currency,
-          provider,
-          executionStatus: TransactionStatus.INITIATED,
-          merchantReference: input.merchantReference ?? input.reference,
           providerReference: input.providerReference ?? input.reference,
-          settlementStatus: TransactionSettlementStatus.UNSETTLED,
-          riskStatus: TransactionRiskStatus.CLEAR,
-          direction: LedgerEntryDirection.DEBIT,
-          idempotencyKey: `wallet-debit:${businessId}:${input.reference}`,
-          metadata: {},
-        },
-        entityManager,
+          transactionType: WalletTransactionType.DEBIT,
+          amount: totalMerchantDebit.toString(),
+          availableBalanceBefore: availableBalanceBefore.toString(),
+          availableBalanceAfter: availableBalanceAfter.toString(),
+          currency,
+          narration: input.narration ?? 'Naira payout',
+          message: null,
+          status: WalletTransactionStatus.PROCESSING,
+          source: WalletTransactionSource.PAYOUT,
+          sourceId: input.sourceId ?? null,
+          idempotencyKey: walletDebitIdempotencyKey,
+          metadata: {
+            payoutAmount: grossPayoutAmount.toString(),
+            merchantFee: merchantFee.toString(),
+            providerFee: providerFee.toString(),
+            revenue: revenue.toString(),
+            merchantReference: input.merchantReference,
+            reference: input.reference,
+            provider: input.provider,
+          },
+        }),
       );
-
-      return transaction;
     });
   }
 

@@ -1,4 +1,5 @@
 export type BankDefinition = {
+  bankId?: string;
   name: string;
   bankCode: string;
 };

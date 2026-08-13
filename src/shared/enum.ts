@@ -10,15 +10,21 @@ export enum BasicStatus {
 
 export enum TransactionSource {
   COLLECTION_FEE = 'COLLECTION_FEE',
-  VIRTUAL_ACCOUNT_COLLECTION = 'VIRTUAL_ACCOUNT_COLLECTION',
-  POS_COLLECTION = 'POS_COLLECTION',
-  DEBIT_CARD_COLLECTION = 'DEBIT_CARD_COLLECTION',
+  WALLET_FUNDING = 'WALLET_FUNDING',
   TRANSFER = 'TRANSFER',
   BILLS_PAYMENT = 'BILLS_PAYMENT',
   BILLS_PAYMENT_FEE = 'BILLS_PAYMENT_FEE',
   TRANSFER_FEE = 'TRANSFER_FEE',
   STAMP_DUTY = 'STAMP_DUTY',
   CHECKOUT_INVOICE = 'CHECKOUT_INVOICE',
+}
+
+export enum CollectionChannel {
+  VIRTUAL_ACCOUNT = 'VIRTUAL_ACCOUNT_COLLECTION',
+  POS = 'POS_COLLECTION',
+  DEBIT_CARD = 'DEBIT_CARD_COLLECTION',
+  CLEVIX_WALLET = 'CLEVIX_WALLET',
+  USSD = 'USSD',
 }
 
 export enum IncomingPaymentSource {
@@ -68,6 +74,29 @@ export enum TransactionRiskStatus {
   DISPUTED = 'DISPUTED',
 }
 
+export enum WalletTransactionType {
+  CREDIT = 'CREDIT',
+  DEBIT = 'DEBIT',
+}
+
+export enum WalletTransactionStatus {
+  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  REVERSED = 'REVERSED',
+}
+
+export enum WalletTransactionSource {
+  COLLECTION = 'COLLECTION',
+  SETTLEMENT = 'SETTLEMENT',
+  PAYOUT = 'PAYOUT',
+  FEE = 'FEE',
+  REVERSAL = 'REVERSAL',
+  ADJUSTMENT = 'ADJUSTMENT',
+  INTERNAL_TRANSFER = 'INTERNAL_TRANSFER',
+}
+
 export enum JobQueueList {
   MONEY_TRANSFER_PROCESSOR = 'MONEY_TRANSFER_PROCESSOR',
 }
@@ -99,4 +128,31 @@ export enum KycStatus {
   IN_REVIEW = 'IN_REVIEW',
   REJECTED = 'REJECTED',
   PENDING = 'PENDING',
+}
+
+export enum TaxCollectionMode {
+  PLATFORM_WITHHELD = 'PLATFORM_WITHHELD',
+  MERCHANT_REMITTED = 'MERCHANT_REMITTED',
+  GOVERNMENT_DIRECT = 'GOVERNMENT_DIRECT',
+}
+
+export enum TaxPayer {
+  CUSTOMER = 'CUSTOMER',
+  BUSINESS = 'BUSINESS',
+}
+
+export enum ActionOwner {
+  USER = 'USER',
+  BUSINESS = 'BUSINESS',
+}
+
+export enum TokenType {
+  PASSWORD_RESET = 'PASSWORD_RESET',
+  EMAIL_VERIFICATION = 'EMAIL_VERIFICATION',
+}
+
+export enum TokenNotificationType {
+  EMAIL = 'EMAIL',
+  SMS = 'SMS',
+  BOTH = 'BOTH',
 }

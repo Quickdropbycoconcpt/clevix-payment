@@ -4,7 +4,6 @@ import {
   IsEnum,
   IsInt,
   IsNotEmpty,
-  IsNumberString,
   IsOptional,
   IsString,
   Matches,
@@ -14,14 +13,6 @@ import {
 import { CollectionProvider } from '../../adapters/contracts/collection-adapter.types';
 
 export class CreateDynamicVirtualAccountDto {
-  @ApiPropertyOptional({
-    enum: CollectionProvider,
-    default: CollectionProvider.VFD,
-  })
-  @IsOptional()
-  @IsEnum(CollectionProvider)
-  provider?: CollectionProvider;
-
   @ApiProperty({ example: 'Ada Lovelace' })
   @IsString()
   @IsNotEmpty()
@@ -49,12 +40,4 @@ export class CreateDynamicVirtualAccountDto {
   @Min(1)
   @Max(1440)
   validityTime: number;
-
-  @ApiPropertyOptional({
-    description:
-      'Fee already computed and included in `amount` upstream (e.g. a customer-borne checkout fee). When set, the wallet credit uses this instead of recomputing a fee off `amount` once the account is funded.',
-  })
-  @IsOptional()
-  @IsNumberString()
-  feeCharged?: string;
 }

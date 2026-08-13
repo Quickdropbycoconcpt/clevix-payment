@@ -10,8 +10,10 @@ import type { TransactionType } from 'src/shared/encryption';
 import { BusinessService } from 'src/modules/businesses/service/business.service';
 import { TransactionService } from 'src/modules/transactions/service/transaction.service';
 import { WalletService } from 'src/modules/wallets/service/wallets.service';
+import { SettlementService } from 'src/modules/settlement-management/service/settlement.account.service';
 import {
   BasicStatus,
+  CollectionChannel,
   LedgerEntryDirection,
   TransactionSource,
   TransactionStatus,
@@ -36,11 +38,16 @@ type ChargePosResponse = ChargePosResult & {
   stan: string;
 };
 
+type ChargePosInput = ChargePosDto & {
+  transactionSource?: TransactionSource;
+};
+
 @Injectable()
 export class PosService {
   constructor(
     private readonly collectionAdapterFactory: CollectionAdapterFactory,
     private readonly walletService: WalletService,
+    private readonly settlementService: SettlementService,
     private readonly transactionService: TransactionService,
     private readonly businessService: BusinessService,
     private readonly posTerminalService: PosTerminalService,
@@ -49,7 +56,7 @@ export class PosService {
   ) {}
 
   async chargePos(
-    dto: ChargePosDto,
+    dto: ChargePosInput,
     scope: RequestScope,
   ): Promise<ChargePosResponse> {
     const referenceExist =
@@ -161,12 +168,13 @@ export class PosService {
      */
     const ourRef = `CLV-${Crypto.randomUUID()}`;
     if (executionStatus === TransactionStatus.SUCCESS) {
-      await this.walletService.creditUserWallet({
+      await this.settlementService.createSettlement({
         businessId: creditBusinessId,
         environment: businessScope.environment,
         currency,
         provider,
-        source: TransactionSource.POS_COLLECTION,
+        source: dto.transactionSource ?? TransactionSource.WALLET_FUNDING,
+        collectionChannel: CollectionChannel.POS,
         amount: dto.amount,
         reference: ourRef,
         merchantReference: reference,
@@ -182,7 +190,8 @@ export class PosService {
         settledAmount: '0',
         currency,
         provider,
-        source: TransactionSource.POS_COLLECTION,
+        source: dto.transactionSource ?? TransactionSource.WALLET_FUNDING,
+        collectionChannel: CollectionChannel.POS,
         reference,
         sourceId: posTransaction.posTransactionId,
         direction: LedgerEntryDirection.CREDIT,
@@ -199,7 +208,8 @@ export class PosService {
         environment: businessScope.environment,
         currency,
         provider,
-        source: TransactionSource.POS_COLLECTION,
+        source: dto.transactionSource ?? TransactionSource.WALLET_FUNDING,
+        collectionChannel: CollectionChannel.POS,
         amount: dto.amount,
         reference,
         sourceId: posTransaction.posTransactionId,

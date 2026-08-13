@@ -1,4 +1,4 @@
-import { TransactionSource } from 'src/shared/enum';
+import { CollectionChannel, TransactionSource } from 'src/shared/enum';
 import { VirtualAccountCreditResponse } from '../../adapters/contracts/virtual-account.adapter';
 
 export const VIRTUAL_ACCOUNT_CREDIT_QUEUE = 'VIRTUAL_ACCOUNT_CREDIT';
@@ -8,6 +8,7 @@ export type VirtualAccountCreditJobData = {
   dvaId: string;
   businessId: string;
   source: TransactionSource;
+  collectionChannel: CollectionChannel;
   environment: string;
   provider: string;
   merchantReference: string;

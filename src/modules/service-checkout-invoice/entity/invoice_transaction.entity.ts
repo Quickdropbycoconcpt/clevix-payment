@@ -23,6 +23,9 @@ export class InvoicePaymentTransaction extends BaseEntity {
   @Column({ type: 'enum', enum: SupportedPaymentMethod })
   method: SupportedPaymentMethod;
 
+  @Column({ type: 'varchar', nullable: true })
+  invoiceTransactionReference: string;
+
   @Column({
     type: 'enum',
     enum: TransactionStatus,

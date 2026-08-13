@@ -1,6 +1,13 @@
 import { BaseEntity } from 'src/infrastructure/database/base_entiy';
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { OrganizationService } from './service_definition.entity';
+import { TaxConfiguration } from 'src/modules/tax-management/entity/tax-config.entity';
 
 @Entity('service_items')
 export class ServiceItems extends BaseEntity {
@@ -16,8 +23,18 @@ export class ServiceItems extends BaseEntity {
   @Column({ type: 'bigint', nullable: true })
   fixedAmount: string;
 
+  @Column({ type: 'boolean', default: true })
+  isActive: boolean;
+
   @Column({ type: 'varchar' })
   settlementAccountId: string;
+
+  @Column({ type: 'uuid', nullable: true })
+  taxId: string | null;
+
+  @ManyToOne(() => TaxConfiguration)
+  @JoinColumn({ name: 'taxId' })
+  tax: TaxConfiguration;
 
   @ManyToOne(() => OrganizationService, (service) => service.items)
   service: OrganizationService;

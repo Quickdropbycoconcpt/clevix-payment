@@ -10,8 +10,8 @@ import { TransactionModule } from 'src/modules/transactions/transactions.module'
 import { CardPaymentWebhookQueue } from './jobs/card-payment-webhook.queue';
 import { CardPaymentWebhookProcessor } from './jobs/card-payment-webhook.processor';
 import { CARD_PAYMENT_WEBHOOK_QUEUE } from './jobs/card-payment-webhook.job';
-import { WalletModule } from 'src/modules/wallets/wallets.module';
 import { ReconciliationModule } from 'src/modules/reconciliation/reconciliation.module';
+import { SettlementManagementModule } from 'src/modules/settlement-management/settlement-management.module';
 
 @Module({
   imports: [
@@ -21,8 +21,8 @@ import { ReconciliationModule } from 'src/modules/reconciliation/reconciliation.
     }),
     VfdModule,
     TransactionModule,
-    WalletModule,
     ReconciliationModule,
+    SettlementManagementModule,
   ],
   controllers: [CardCardPaymentsController],
   providers: [

@@ -1,14 +1,26 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { JwtPayload } from '../interface/jwt-payload.interface';
+import {
+  AuthenticatedRequest,
+  JwtPayload,
+} from '../interface/jwt-payload.interface';
 
 export const CurrentUser = createParamDecorator(
   (data: keyof JwtPayload | undefined, context: ExecutionContext) => {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const user = request.user;
 
-    if (!data) {
-      return request.user;
+    if (!user) {
+      return undefined;
     }
 
-    return request.user?.[data];
+    if (request.pagination) {
+      user.pagination = request.pagination;
+    }
+
+    if (!data) {
+      return user;
+    }
+
+    return user[data];
   },
 );
