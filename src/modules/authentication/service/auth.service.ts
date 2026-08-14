@@ -23,7 +23,7 @@ export class AuthService {
     try {
       const account = await this.userService.setupNewAccount(dto);
       const token = this.tokenService.generateNumericToken(6);
-      const saved = await this.tokenService.generateToken({
+      this.tokenService.generateToken({
         token,
         ownerId: account.userId,
         ownerType: ActionOwner.USER,
@@ -32,7 +32,7 @@ export class AuthService {
         expiresAt: 60,
         type: TokenType.EMAIL_VERIFICATION,
       });
-      return { account, tokenId: saved.tokenId };
+      return { account };
     } catch (error: any) {
       throw new BadRequestException(error?.message);
     }
