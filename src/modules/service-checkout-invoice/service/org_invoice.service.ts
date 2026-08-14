@@ -84,6 +84,12 @@ export class OrganisationInvoiceService {
 
     const paymentRule = this.getInvoicePaymentRule(service);
     const resolvedItems = await this.resolveInvoiceItems(service, input.items);
+    if (input.items.length > 0) {
+      /***We are limiting one invoice to a single item
+       * This is to ensure easier accounting for businesses.
+       */
+      throw new BadRequestException(`An invoice can only contain one item`);
+    }
     const amount = resolvedItems
       .reduce((total, item) => total + BigInt(item.amount), 0n)
       .toString();
