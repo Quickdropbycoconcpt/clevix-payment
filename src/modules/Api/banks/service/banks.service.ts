@@ -31,7 +31,6 @@ export class BanksService {
       where: searchName ? { name: ILike(`%${searchName}%`) } : undefined,
       order: { name: 'ASC' },
     });
-
     return banks.map((bank) => ({
       bankId: bank.bankId,
       name: bank.name,
@@ -39,7 +38,7 @@ export class BanksService {
     }));
   }
 
-  // @Cron(CronExpression.EVERY_HOUR)
+  @Cron(CronExpression.EVERY_DAY_AT_4PM)
   async syncBanksFromProvider(): Promise<void> {
     const adapter = this.banksAdapterFactory.getBankAdapter(BankProvider.VFD);
     const providerBanks = await adapter.getBanks();
