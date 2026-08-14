@@ -5,6 +5,7 @@ import {
   ApiLoginDto,
   CreateAccountDto,
   LoginDto,
+  ResetPasswordDto,
   VerifyEmailDto,
 } from '../dto/auth.dto';
 import { Public } from '../decorators/public.decorator';
@@ -31,6 +32,13 @@ export class AuthControllers {
   @Public()
   async verifyEmail(@Body() dto: VerifyEmailDto) {
     const account = await this.authService.verifyEmailAddress(dto.otp);
+    return account;
+  }
+
+  @Post('reset-password')
+  @Public()
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    const account = await this.authService.requestPasswordReset(dto);
     return account;
   }
 

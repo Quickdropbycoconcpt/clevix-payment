@@ -2,7 +2,12 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { JwtPayload } from '../interface/jwt-payload.interface';
-import { ApiLoginDto, CreateAccountDto, LoginDto } from '../dto/auth.dto';
+import {
+  ApiLoginDto,
+  CreateAccountDto,
+  LoginDto,
+  ResetPasswordDto,
+} from '../dto/auth.dto';
 import { UserService } from 'src/modules/users/service/user.service';
 import { KeysService } from 'src/modules/key-management/service/keys.service';
 import * as argon from 'argon2';
@@ -151,7 +156,18 @@ export class AuthService {
     return { accessToken };
   }
 
-  async requestPasswordReset() {}
+  async requestPasswordReset(dto: ResetPasswordDto) {
+    const vToken = await this.tokenService.ValidateToken({
+      token: dto.token,
+      ownerType: ActionOwner.USER,
+      type: TokenType.PASSWORD_RESET,
+    });
 
-  async resetPassword() {}
+    const result = await this.userService.resetPassword(
+      vToken.ownerId,
+      dto.newPassword,
+    );
+
+    return result;
+  }
 }

@@ -220,4 +220,19 @@ export class UserService {
   async verifyEmail(userId: string) {
     return await this.userRepo.update({ userId }, { isEmailVerified: true });
   }
+
+  async resetPassword(userId: string, newPassword: string) {
+    const user = await this.userRepo.findOne({ where: { userId } });
+
+    if (!user) {
+      throw new BadRequestException('Account not found');
+    }
+
+    await this.userRepo.update(
+      { userId },
+      { password: await argon.hash(newPassword) },
+    );
+
+    return { message: 'Password reset successfully' };
+  }
 }

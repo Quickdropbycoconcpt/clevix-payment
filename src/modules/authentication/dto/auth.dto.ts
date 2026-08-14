@@ -101,3 +101,14 @@ export class ApiLoginDto {
   @IsPositive()
   duration: number;
 }
+
+export class ResetPasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  token: string;
+
+  @ApiProperty({ minLength: 8, example: 'NewStrongPass123!' })
+  @IsString()
+  @MinLength(8)
+  newPassword: string;
+}
