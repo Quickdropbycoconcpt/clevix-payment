@@ -20,7 +20,7 @@ import {
 import { TaxManagementService } from '../service/tax-management.service';
 
 @ApiTags('Dashboard Tax Management')
-@Controller('dashboard/tax-management')
+@Controller('v1/dashboard/tax-management')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)
 export class TaxManagementController {

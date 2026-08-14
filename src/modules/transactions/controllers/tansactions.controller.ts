@@ -8,7 +8,7 @@ import { TransactionsServiceListing } from '../service/list-transactions.service
 
 @ApiTags('API Transactions')
 @ApiBearerAuth('bearer')
-@Controller('transactions')
+@Controller('v1/transactions')
 @UseGuards(ApiJwtAuthGuard)
 export class TransactionsController {
   constructor(

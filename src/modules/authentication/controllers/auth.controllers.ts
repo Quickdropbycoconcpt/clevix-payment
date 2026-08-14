@@ -11,7 +11,7 @@ import {
 import { Public } from '../decorators/public.decorator';
 
 @ApiTags('Auth Management')
-@Controller('auth')
+@Controller('v1/auth')
 export class AuthControllers {
   constructor(private readonly authService: AuthService) {}
 

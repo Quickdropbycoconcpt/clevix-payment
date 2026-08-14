@@ -5,7 +5,7 @@ import { BanksService } from 'src/modules/Api/banks/service/banks.service';
 import { ValidateAccountDto } from 'src/modules/Api/banks/dto/banks.dto';
 
 @ApiTags('Dashboard Banks')
-@Controller('dashboard/banks')
+@Controller('v1/dashboard/banks')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)
 export class DashboardBanksController {

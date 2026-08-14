@@ -7,7 +7,7 @@ import {
 } from '../dto/resend-token.dto';
 
 @ApiTags('Token Management')
-@Controller('token')
+@Controller('v1/token')
 export class TokenController {
   constructor(private readonly tokenService: TokenService) {}
 

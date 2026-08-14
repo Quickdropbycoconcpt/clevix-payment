@@ -8,7 +8,7 @@ import { BusinessDashboardAuth } from 'src/modules/authentication/decorators/bus
 
 @ApiTags('Dashboard Transactions')
 @ApiBearerAuth('bearer')
-@Controller('dashboard/transactions')
+@Controller('v1/dashboard/transactions')
 @BusinessDashboardAuth()
 export class DashboardTransactionsController {
   constructor(private readonly listTxnService: TransactionsServiceListing) {}

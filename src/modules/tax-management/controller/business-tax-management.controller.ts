@@ -8,7 +8,7 @@ import { TaxManagementService } from '../service/tax-management.service';
 
 @ApiTags('Business Tax Management')
 @ApiBearerAuth('bearer')
-@Controller('tax-management')
+@Controller('v1/tax-management')
 @BusinessDashboardAuth()
 export class BusinessTaxManagementController {
   constructor(private readonly taxManagementService: TaxManagementService) {}

@@ -13,7 +13,7 @@ import {
 } from '../dto/create-static-account.dto';
 
 @ApiTags('API VIRTUAL ACCOUNT COLLECTION')
-@Controller('collection')
+@Controller('v1/collection')
 @ApiBearerAuth('bearer')
 @UseGuards(ApiJwtAuthGuard)
 export class VirtualAccountsController {

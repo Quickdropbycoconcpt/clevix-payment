@@ -9,7 +9,7 @@ import { VerifyNinDto } from '../dto/verify-nin.dto';
 import { KycService } from '../service/kyc.service';
 
 @ApiTags('KYC Management')
-@Controller('kyc')
+@Controller('v1/kyc')
 @ApiBearerAuth('bearer')
 @UseGuards(ApiJwtAuthGuard)
 export class KycController {

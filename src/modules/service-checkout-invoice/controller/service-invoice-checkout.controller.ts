@@ -8,7 +8,7 @@ import { SupportedPaymentMethod } from '../entity/invoice_transaction.entity';
 import { BusinessDashboardAuth } from 'src/modules/authentication/decorators/business-dashboard-auth.decorator';
 
 @ApiTags('SERVICE CHECKOUT INVOICE')
-@Controller('checkout/invoice')
+@Controller('v1/checkout/invoice')
 export class ServiceInvoiceCheckoutController {
   constructor(private readonly service: OrganisationInvoiceService) {}
 

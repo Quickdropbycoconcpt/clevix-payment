@@ -17,7 +17,7 @@ import { JwtAuthGuard } from 'src/modules/authentication/guards/jwt-auth.guard';
 import { BusinessContextGuard } from 'src/modules/authentication/guards/business-context.guard';
 import { CreateBusinessDto } from '../dto/business.dto';
 
-@Controller('business')
+@Controller('v1/business')
 @ApiTags('Business Management')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)

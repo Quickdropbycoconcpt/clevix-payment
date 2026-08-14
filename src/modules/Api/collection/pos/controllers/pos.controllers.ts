@@ -18,7 +18,7 @@ import { Public } from 'src/modules/authentication/decorators/public.decorator';
 import { JwtAuthGuard } from 'src/modules/authentication/guards/jwt-auth.guard';
 
 @ApiTags('API POS COLLECTION')
-@Controller('collection/pos')
+@Controller('v1/collection/pos')
 @ApiBearerAuth('bearer')
 export class PosController {
   constructor(

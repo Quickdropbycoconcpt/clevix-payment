@@ -6,7 +6,7 @@ import type { JwtPayload } from 'src/modules/authentication/interface/jwt-payloa
 import { BusinessMembersService } from '../service/business-members.service';
 
 @ApiTags('Business members management')
-@Controller('business-member')
+@Controller('v1/business-member')
 @UseGuards(JwtAuthGuard)
 export class BusinessMemberController {
   constructor(private readonly memberService: BusinessMembersService) {}

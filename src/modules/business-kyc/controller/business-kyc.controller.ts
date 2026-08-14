@@ -10,7 +10,7 @@ import {
 import { BusinessKycService } from '../service/business-kyc.service';
 import { BusinessDashboardAuth } from 'src/modules/authentication/decorators/business-dashboard-auth.decorator';
 
-@Controller('business-kyc')
+@Controller('v1/business-kyc')
 @ApiTags('Business Kyc Management')
 @ApiBearerAuth('bearer')
 @BusinessDashboardAuth()

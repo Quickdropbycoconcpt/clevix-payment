@@ -9,7 +9,7 @@ import { PermissionsEnum } from 'src/modules/business-members/enums/business-mem
 
 @ApiTags('Key Management')
 @ApiBearerAuth('bearer')
-@Controller('keys')
+@Controller('v1/keys')
 @BusinessDashboardAuth()
 export class KeyControllers {
   constructor(private readonly keyService: KeysService) {}

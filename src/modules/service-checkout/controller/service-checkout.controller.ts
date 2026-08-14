@@ -19,7 +19,7 @@ import { ServiceCheckout } from '../service/service-checkout.service';
 import { BusinessDashboardAuth } from 'src/modules/authentication/decorators/business-dashboard-auth.decorator';
 
 @ApiTags('SERVICE CHECKOUT')
-@Controller('service-checkout')
+@Controller('v1/service-checkout')
 @ApiBearerAuth('bearer')
 export class ServiceCheckoutController {
   constructor(private readonly serviceCheckout: ServiceCheckout) {}

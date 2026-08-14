@@ -15,7 +15,7 @@ import { AddSettlementBankDto } from '../dto/settlement.dto';
 import { SettlementService } from '../service/settlement.account.service';
 import { BusinessDashboardAuth } from 'src/modules/authentication/decorators/business-dashboard-auth.decorator';
 
-@Controller('settlement')
+@Controller('v1/settlement')
 @ApiTags('Settlement Management')
 @ApiBearerAuth('bearer')
 @BusinessDashboardAuth()

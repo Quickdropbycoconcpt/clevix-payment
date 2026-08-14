@@ -8,7 +8,7 @@ import { ApiJwtAuthGuard } from 'src/modules/authentication/guards/api-guard';
 import { Public } from 'src/modules/authentication/decorators/public.decorator';
 
 @ApiTags('Card Payment transactions')
-@Controller('collection')
+@Controller('v1/collection')
 @ApiBearerAuth('bearer')
 @UseGuards(ApiJwtAuthGuard)
 export class CardCardPaymentsController {

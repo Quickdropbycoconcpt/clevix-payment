@@ -7,7 +7,7 @@ import type { JwtPayload } from 'src/modules/authentication/interface/jwt-payloa
 import { ApiJwtAuthGuard } from 'src/modules/authentication/guards/api-guard';
 
 @ApiTags('DISURSEMENT API')
-@Controller('disbursement')
+@Controller('v1/disbursement')
 @ApiBearerAuth('bearer')
 @UseGuards(ApiJwtAuthGuard)
 export class TransferController {
