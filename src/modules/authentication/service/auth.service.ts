@@ -37,7 +37,10 @@ export class AuthService {
         expiresAt: 60,
         type: TokenType.EMAIL_VERIFICATION,
       });
-      return { account };
+      const jwt = await this.dashBoardAccessToken({
+        userId: account?.userId,
+      });
+      return { account, accessToken: jwt };
     } catch (error: any) {
       throw new BadRequestException(error?.message);
     }
