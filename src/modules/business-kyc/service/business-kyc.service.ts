@@ -10,6 +10,7 @@ import {
   SubmitBusinessInfoDto,
 } from '../dto/business-kyc.dto';
 import { RequestScope } from 'src/shared/business-scope';
+import { KycStatus, VerificationStatus } from 'src/shared/enum';
 import { BusinessService } from 'src/modules/businesses/service/business.service';
 import { OrganizationType } from 'src/shared/enum';
 
@@ -143,6 +144,87 @@ export class BusinessKycService {
       this.logger.error(error);
       throw new BadRequestException(error.message);
     }
+  }
+
+  async kycStage(scope: RequestScope) {
+    // Fetch business basic info including kycStatus
+    const business = await this.businessService.findBusinessById(
+      scope.businessId,
+    );
+
+    const info = await this.businessInfoRepo.findOne({
+      where: { businessId: scope.businessId },
+    });
+
+    const documents = await this.businessDocuments.find({
+      where: { businessId: scope.businessId },
+    });
+
+    const representatives = await this.businessRepresentatives.find({
+      where: { businessId: scope.businessId },
+    });
+
+    const docsUploaded = documents.length > 0;
+    const repsAdded = representatives.length > 0;
+
+    const docsAllVerified = docsUploaded
+      ? documents.every(
+          (d) => d.verificationStatus === VerificationStatus.VERIFIED,
+        )
+      : false;
+    const docsAnyRejected = docsUploaded
+      ? documents.some(
+          (d) => d.verificationStatus === VerificationStatus.REJECTED,
+        )
+      : false;
+
+    const repsAllVerified = repsAdded
+      ? representatives.every(
+          (r) => r.verificationStatus === VerificationStatus.VERIFIED,
+        )
+      : false;
+    const repsAnyRejected = repsAdded
+      ? representatives.some(
+          (r) => r.verificationStatus === VerificationStatus.REJECTED,
+        )
+      : false;
+
+    // Determine overall stage
+    let stage = 'NOT_STARTED';
+
+    if (business?.kycStatus === KycStatus.APPROVED) {
+      stage = 'APPROVED';
+    } else if (business?.kycStatus === KycStatus.REJECTED) {
+      stage = 'REJECTED';
+    } else if (!info) {
+      stage = 'INFO_PENDING';
+    } else if (!docsUploaded) {
+      stage = 'DOCUMENTS_PENDING';
+    } else if (!repsAdded) {
+      stage = 'REPRESENTATIVES_PENDING';
+    } else if (docsAnyRejected || repsAnyRejected) {
+      stage = 'REJECTED';
+    } else {
+      stage = 'IN_REVIEW';
+    }
+
+    return {
+      stage,
+      kycStatus: business?.kycStatus ?? KycStatus.PENDING,
+      infoPresent: !!info,
+      documents: {
+        count: documents.length,
+        uploaded: docsUploaded,
+        allVerified: docsAllVerified,
+        anyRejected: docsAnyRejected,
+      },
+      representatives: {
+        count: representatives.length,
+        added: repsAdded,
+        allVerified: repsAllVerified,
+        anyRejected: repsAnyRejected,
+      },
+    };
   }
 
   private async repBulkInssert(

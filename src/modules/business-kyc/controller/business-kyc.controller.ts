@@ -56,4 +56,9 @@ export class BusinessKycController {
   async getOrgType() {
     return this.businessKycService.getOrganizationType();
   }
+
+  @Get('current-stage')
+  async getKycCurrentStage(@CurrentUser() scope: RequestScope) {
+    return this.businessKycService.kycStage(scope);
+  }
 }
