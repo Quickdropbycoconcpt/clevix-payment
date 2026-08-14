@@ -100,7 +100,7 @@ export class TokenService {
           `No email configuration found for token type: ${input.type}`,
         );
       }
-      await this.emailService.sendTemplateEmail({
+      this.emailService.sendTemplateEmail({
         to: input.recipientEmail,
         template: config.template,
         context: {

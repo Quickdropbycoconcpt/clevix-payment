@@ -46,6 +46,7 @@ export class EmailService {
         rejected: this.normalizeAddressResult(result.rejected),
       };
     } catch (error: any) {
+      this.logger.error(error);
       this.logger.error(
         `Unable to send email: ${error?.message ?? 'unknown error'}`,
       );
