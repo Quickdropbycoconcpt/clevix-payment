@@ -118,11 +118,11 @@ export class AuthService {
       throw new BadRequestException('Account not found');
     }
 
-    // if (account.user.isEmailVerified == false) {
-    //   throw new BadRequestException(
-    //     'Please verify your email address to proceed',
-    //   );
-    // }
+    if (account.user.isEmailVerified == false) {
+      throw new BadRequestException(
+        'Please verify your email address to proceed',
+      );
+    }
 
     const passwordValid = await argon.verify(
       account.user.password,
