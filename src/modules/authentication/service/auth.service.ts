@@ -118,7 +118,7 @@ export class AuthService {
       throw new BadRequestException('Account not found');
     }
 
-    if (account.user.isEmailVerified == false) {
+    if (!account.user.isEmailVerified) {
       throw new BadRequestException(
         'Please verify your email address to proceed',
       );

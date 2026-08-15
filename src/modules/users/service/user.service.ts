@@ -113,7 +113,12 @@ export class UserService {
   async dashBoardAuthentication(email: string) {
     const user = await this.userRepo.findOne({
       where: { email: email.toLowerCase().trim() },
-      select: { password: true, userId: true },
+      select: {
+        password: true,
+        userId: true,
+        isEmailVerified: true,
+        isPhoneVerified: true,
+      },
     });
 
     if (!user) {
