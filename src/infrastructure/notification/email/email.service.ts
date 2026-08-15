@@ -5,6 +5,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import {
@@ -24,27 +26,104 @@ export class EmailService {
   constructor(
     private readonly config: ConfigService,
     private readonly emailTemplateService: EmailTemplateService,
+    private readonly httpService: HttpService,
   ) {}
 
   async getEmailTransporter(input: SendEmailInput): Promise<SendEmailResult> {
     this.validateEmailInput(input);
     try {
-      const result = await this.getTransporter().sendMail({
-        from: input.from ?? this.getDefaultSender(),
-        to: input.to,
-        cc: input.cc,
-        bcc: input.bcc,
-        replyTo: input.replyTo,
-        subject: input.subject.trim(),
-        html: input.html,
-        attachments: input.attachments,
-      });
+      const useSmtp = process.env.USE_SMTP;
+      if (useSmtp) {
+        const result = await this.getTransporter().sendMail({
+          from: input.from ?? this.getDefaultSender(),
+          to: input.to,
+          cc: input.cc,
+          bcc: input.bcc,
+          replyTo: input.replyTo,
+          subject: input.subject.trim(),
+          html: input.html,
+          attachments: input.attachments,
+        });
 
-      return {
-        messageId: result.messageId,
-        accepted: this.normalizeAddressResult(result.accepted),
-        rejected: this.normalizeAddressResult(result.rejected),
-      };
+        return {
+          messageId: result.messageId,
+          accepted: this.normalizeAddressResult(result.accepted),
+          rejected: this.normalizeAddressResult(result.rejected),
+        };
+      } else {
+        // Use ZeptoMail API via project's HttpService
+        const apiKey =
+          this.config.get<string>('ZEPTOMAIL_API_KEY') ??
+          process.env.ZEPTOMAIL_API_KEY;
+
+        if (!apiKey) {
+          throw new InternalServerErrorException(
+            'No SMTP configured and ZEPTOMAIL_API_KEY is not set',
+          );
+        }
+
+        const toList = Array.isArray(input.to) ? input.to : [input.to];
+        const toPayload = toList
+          .map((t) => this.normalizeAddress(t))
+          .filter(Boolean)
+          .map((address) => ({ email_address: { address } }));
+
+        if (!toPayload.length) {
+          throw new BadRequestException('Email recipient is required');
+        }
+
+        const fromRaw = input.from ?? this.getDefaultSender();
+        const extractEmail = (s: string) => {
+          const m = s.match(/<([^>]+)>/);
+          return m ? m[1] : s;
+        };
+
+        const fromAddress = extractEmail(
+          this.normalizeAddress(fromRaw) ?? fromRaw,
+        );
+
+        const payload = {
+          from: { address: fromAddress },
+          to: toPayload,
+          subject: input.subject.trim(),
+          htmlbody: input.html,
+        };
+
+        const url =
+          this.config.get<string>('ZEPTOMAIL_API_URL') ??
+          process.env.ZEPTOMAIL_API_URL ??
+          'https://api.zeptomail.com/v1.1/email';
+
+        const headers = {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          Authorization: `${apiKey}`,
+        };
+
+        const response = await firstValueFrom(
+          this.httpService.post(url, payload, { headers }),
+        );
+
+        if (!response || response.status >= 400) {
+          this.logger.error(
+            'ZeptoMail send failed',
+            response?.data ?? response?.statusText,
+          );
+          throw new InternalServerErrorException(
+            'Unable to send email via ZeptoMail',
+          );
+        }
+
+        const accepted = toList
+          .map((t) => this.normalizeAddress(t))
+          .filter(Boolean) as string[];
+
+        return {
+          messageId: response.headers?.['x-message-id'] ?? '',
+          accepted,
+          rejected: [],
+        };
+      }
     } catch (error: any) {
       this.logger.error(error);
       this.logger.error(
