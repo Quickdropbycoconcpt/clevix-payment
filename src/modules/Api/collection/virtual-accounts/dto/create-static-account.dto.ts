@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export enum AccountType {
   INDIVIDUAL = 'INDIVIDUAL',
@@ -31,6 +31,7 @@ export class CreateIndividualStaticAccountDto {
 
   @IsString()
   @IsNotEmpty()
+  @IsOptional()
   address: string;
 }
 
