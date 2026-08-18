@@ -18,7 +18,6 @@
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
     "seed": "ts-node -r tsconfig-paths/register -r dotenv/config src/infrastructure/seeders/index.ts",
-    "postinstall": "npm run migration:run && npm run seed",
     "seed:permissions": "ts-node -r tsconfig-paths/register -r dotenv/config src/infrastructure/seeders/permissions.ts",
     "seed:nigeria": "ts-node -r tsconfig-paths/register -r dotenv/config src/infrastructure/seeders/nigeria.ts",
     "test": "jest",
