@@ -16,20 +16,6 @@ export type OtpContext = {
   productName?: string;
 };
 
-export type EmailConfirmationContext = {
-  name?: string;
-  productName?: string;
-  token?: string;
-  link?: string | null;
-};
-
-export type PasswordResetContext = {
-  name?: string;
-  productName?: string;
-  token?: string;
-  link?: string | null;
-};
-
 export type EmailTemplateContextMap = {
   welcome: WelcomeEmailContext;
   email_confirmation: OtpContext;

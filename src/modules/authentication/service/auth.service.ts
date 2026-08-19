@@ -73,16 +73,18 @@ export class AuthService {
     });
     return { tokenId: saved.tokenId };
   }
-
-  async dashBoardAccessToken(
+async dashBoardAccessToken(
     payload: JwtPayload,
   ): Promise<{ accessToken: string; tokenType: 'Bearer'; expiresIn: string }> {
+    const expiresIn = '24h';
+
     return {
       accessToken: await this.jwtService.signAsync(payload, {
         secret: this.config.get('JWT_DASHBOARD_TOKEN_SECRET'),
+        expiresIn, 
       }),
       tokenType: 'Bearer',
-      expiresIn: '24h',
+      expiresIn,
     };
   }
 

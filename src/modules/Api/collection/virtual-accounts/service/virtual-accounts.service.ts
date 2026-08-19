@@ -165,7 +165,6 @@ export class VirtualAccountsService {
   }
 
   async clearExpiredDynamicAccounts(): Promise<number> {
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     const result = await this.dvaRepo
       .createQueryBuilder()
       .update(DynamicVirtualAccounts)
@@ -175,7 +174,7 @@ export class VirtualAccountsService {
         updatedAt: new Date(),
       })
       .where('"status" = :status', { status: BasicStatus.ACTIVE })
-      .andWhere('"createdAt" <= :oneHourAgo', { oneHourAgo })
+      .andWhere(`"createdAt" + ("validityTime" * interval '1 second') <= NOW()`)
       .execute();
 
     return result.affected ?? 0;
@@ -316,6 +315,7 @@ export class VirtualAccountsService {
       this.collectionAdapterFactory.getVirtualAccountAdapter(provider);
     const result = adapter.incomingPaymentWebhook(body);
     if (!result?.receivedAccountNumber) {
+      this.logger.log('No account found');
       return;
     }
     let dva = await this.dvaRepo.findOne({
