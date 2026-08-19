@@ -114,7 +114,7 @@ export class VirtualAccountsService {
           reference: ourRef,
           provider,
           currency: 'NGN',
-          source: dto.transactionSource ?? TransactionSource.WALLET_FUNDING,
+          source: dto.transactionSource ?? TransactionSource.API_REQUEST,
           collectionChannel: CollectionChannel.VIRTUAL_ACCOUNT,
           environment: scope.environment,
           direction: LedgerEntryDirection.CREDIT,
