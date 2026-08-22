@@ -29,7 +29,6 @@ export class PosController {
   @Post('charge')
   @UseGuards(ApiJwtAuthGuard)
   async chargePos(@Body() dto: ChargePosDto, @CurrentUser() user: JwtPayload) {
-    console.log(dto);
     return this.posService.chargePos(dto, user);
   }
 
