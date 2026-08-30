@@ -236,7 +236,9 @@ export class TokenService {
     });
 
     const rawToken = this.generateNumericToken(6);
-
+    if (!user) {
+      throw new BadRequestException(`Account not found`);
+    }
     const savedToken = await this.generateToken({
       token: rawToken,
       ownerId: user.userId,
