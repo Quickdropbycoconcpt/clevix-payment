@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { SettlementInput } from '../interface/settlement.interface';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { SettlementBankAccounts } from '../entity/settlement_accounts.entity';
 import { getBusinessScope, RequestScope } from 'src/shared/business-scope';
 import { Banks } from 'src/modules/Api/banks/entity/banks.entity';
@@ -959,7 +959,8 @@ export class SettlementService {
       })
       .andWhere('settlementAccount.environment = :environment', {
         environment,
-      });
+      })
+      .andWhere('settlementAccount.deletedAt IS NULL');
 
     if (name) {
       query.andWhere('settlementAccount.accountName ILIKE :accountName', {

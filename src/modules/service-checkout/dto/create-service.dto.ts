@@ -10,6 +10,7 @@ import {
   IsNumberString,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   Min,
   ValidateIf,
@@ -58,8 +59,7 @@ export class CreateServiceItemDto {
   })
   fixedAmount?: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   settlementAccountId: string;
 
   @ApiPropertyOptional({
