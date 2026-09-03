@@ -119,7 +119,7 @@ export class ServiceCheckout {
       if (bankAccountIds.length != 0) {
         const banks = await this.settlementAccountRepo.find({
           where: {
-            providerbankId: In(bankAccountIds),
+            bankAccountId: In(bankAccountIds),
           },
         });
         if (banks.length != bankAccountIds.length) {
