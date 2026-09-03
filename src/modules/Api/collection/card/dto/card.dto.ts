@@ -1,13 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumberString, IsString, Matches } from 'class-validator';
+import { IsNotEmpty, IsString, Matches } from 'class-validator';
+import { IsBigIntAmountString } from 'src/shared/validators/is-bigint-amount-string.validator';
 
 export class CardDto {
   @IsString()
   @IsNotEmpty()
   cardInformation: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsBigIntAmountString()
   amount: string;
 
   @IsString()
@@ -17,8 +17,7 @@ export class CardDto {
 
 export class CardPaymentDto {
   @ApiProperty({ example: '1000' })
-  @IsString()
-  @IsNotEmpty()
+  @IsBigIntAmountString()
   amount: string;
 
   @ApiProperty({ example: 'rosapay-01919' })

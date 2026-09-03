@@ -1,8 +1,8 @@
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBigIntAmountString } from 'src/shared/validators/is-bigint-amount-string.validator';
 
 export class WithdrawalDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsBigIntAmountString()
   amount: string;
 
   @IsString()

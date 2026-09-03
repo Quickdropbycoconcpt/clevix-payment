@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsOptional, IsPositive, IsString } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsPositive,
+  IsString,
+  Max,
+} from 'class-validator';
 
 export class SimulateInwardCreditDto {
   @IsString()
@@ -10,6 +17,8 @@ export class SimulateInwardCreditDto {
   @IsOptional()
   accountNumber: string;
 
+  @IsInt()
   @IsPositive()
+  @Max(Number.MAX_SAFE_INTEGER)
   amount: number;
 }

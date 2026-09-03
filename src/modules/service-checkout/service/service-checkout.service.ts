@@ -7,7 +7,12 @@ import { In, Repository } from 'typeorm';
 import { OrganizationService } from '../entity/service_definition.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OrganisationPaymentRules } from '../entity/service_payment_rules.entity';
-import { CreateService } from '../interface/service.interface';
+import {
+  CreateService,
+  CreateServiceItem,
+  UpdateService,
+  UpdateServiceItem,
+} from '../interface/service.interface';
 import { Businesses } from 'src/modules/businesses/entity/business.entity';
 import {
   FormOwnerType,
@@ -30,7 +35,23 @@ export class ServiceCheckout {
     private readonly customForms: Repository<OrganisationCustomForm>,
     @InjectRepository(SettlementBankAccounts)
     private readonly settlementAccountRepo: Repository<SettlementBankAccounts>,
+    @InjectRepository(ServiceItems)
+    private readonly serviceItemRepo: Repository<ServiceItems>,
   ) {}
+
+  private async assertSettlementAccountsExist(bankAccountIds: string[]) {
+    if (bankAccountIds.length === 0) {
+      return;
+    }
+
+    const banks = await this.settlementAccountRepo.find({
+      where: { bankAccountId: In(bankAccountIds) },
+    });
+
+    if (banks.length !== new Set(bankAccountIds).size) {
+      throw new BadRequestException(`Please select from account you have added`);
+    }
+  }
 
   async getMandatoryFields(environment: string) {
     return this.customForms.find({
@@ -116,18 +137,8 @@ export class ServiceCheckout {
       const bankAccountIds = input.items
         .filter((item) => item.settlementAccountId != null)
         .map((i) => i.settlementAccountId);
-      if (bankAccountIds.length != 0) {
-        const banks = await this.settlementAccountRepo.find({
-          where: {
-            bankAccountId: In(bankAccountIds),
-          },
-        });
-        if (banks.length != bankAccountIds.length) {
-          throw new BadRequestException(
-            `Please select from account you have added`,
-          );
-        }
-      }
+      await this.assertSettlementAccountsExist(bankAccountIds);
+
       const newPaymentRule = paymentRuleRepo.create({
         businessId: input.businessId,
         environment: input.environment,
@@ -200,6 +211,129 @@ export class ServiceCheckout {
 
       return { serviceName: service.serviceName };
     });
+  }
+
+  async toggleServiceStatus(scope: RequestScope, serviceId: string) {
+    const { businessId, environment } = getBusinessScope(scope);
+
+    const service = await this.serviceRepo.findOne({
+      where: { serviceId: serviceId.trim(), businessId, environment },
+    });
+
+    if (!service) {
+      throw new NotFoundException('Service not found');
+    }
+
+    service.isActive = !service.isActive;
+    await this.serviceRepo.save(service);
+
+    return { serviceId: service.serviceId, isActive: service.isActive };
+  }
+
+  async updateService(
+    scope: RequestScope,
+    serviceId: string,
+    input: UpdateService,
+  ) {
+    const { businessId, environment } = getBusinessScope(scope);
+
+    const service = await this.serviceRepo.findOne({
+      where: { serviceId: serviceId.trim(), businessId, environment },
+    });
+
+    if (!service) {
+      throw new NotFoundException('Service not found');
+    }
+
+    if (input.serviceName !== undefined) {
+      service.serviceName = input.serviceName;
+    }
+    if (input.apiInitiationOnly !== undefined) {
+      service.apiInitiationOnly = input.apiInitiationOnly;
+    }
+    if (input.customerPayForListOfItems !== undefined) {
+      service.customerPayForListOfItems = input.customerPayForListOfItems;
+    }
+
+    return this.serviceRepo.save(service);
+  }
+
+  async addServiceItem(
+    scope: RequestScope,
+    serviceId: string,
+    input: CreateServiceItem,
+  ) {
+    const { businessId, environment } = getBusinessScope(scope);
+
+    const service = await this.serviceRepo.findOne({
+      where: { serviceId: serviceId.trim(), businessId, environment },
+    });
+
+    if (!service) {
+      throw new NotFoundException('Service not found');
+    }
+
+    await this.assertSettlementAccountsExist([input.settlementAccountId]);
+
+    const item = this.serviceItemRepo.create({
+      businessId,
+      environment,
+      name: input.name,
+      fixedPrice: input.fixedPrice,
+      fixedAmount: input.fixedAmount,
+      settlementAccountId: input.settlementAccountId,
+      taxId: input.taxId ?? null,
+      service: { serviceId: service.serviceId } as OrganizationService,
+    });
+
+    return this.serviceItemRepo.save(item);
+  }
+
+  async updateServiceItem(
+    scope: RequestScope,
+    serviceId: string,
+    itemId: string,
+    input: UpdateServiceItem,
+  ) {
+    const { businessId, environment } = getBusinessScope(scope);
+
+    const item = await this.serviceItemRepo.findOne({
+      where: {
+        itemId: itemId.trim(),
+        businessId,
+        environment,
+        service: { serviceId: serviceId.trim() },
+      },
+    });
+
+    if (!item) {
+      throw new NotFoundException('Service item not found');
+    }
+
+    if (input.settlementAccountId !== undefined) {
+      await this.assertSettlementAccountsExist([input.settlementAccountId]);
+      item.settlementAccountId = input.settlementAccountId;
+    }
+    if (input.name !== undefined) {
+      item.name = input.name;
+    }
+    if (input.fixedPrice !== undefined) {
+      item.fixedPrice = input.fixedPrice;
+    }
+    if (input.fixedAmount !== undefined) {
+      item.fixedAmount = input.fixedAmount;
+    }
+    if (input.taxId !== undefined) {
+      item.taxId = input.taxId;
+    }
+
+    if (item.fixedPrice && !item.fixedAmount) {
+      throw new BadRequestException(
+        'fixedAmount is required when fixedPrice is true',
+      );
+    }
+
+    return this.serviceItemRepo.save(item);
   }
 
   async listServices(scope: RequestScope, name: string) {

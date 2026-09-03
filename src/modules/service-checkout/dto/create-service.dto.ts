@@ -7,16 +7,15 @@ import {
   IsEnum,
   IsInt,
   IsNotEmpty,
-  IsNumberString,
   IsOptional,
   IsString,
   IsUUID,
-  Matches,
   Min,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { FormType } from '../entity/service_payment_form.entity';
+import { IsBigIntAmountString } from 'src/shared/validators/is-bigint-amount-string.validator';
 
 export class CreatePaymentRuleDto {
   @IsBoolean()
@@ -53,10 +52,7 @@ export class CreateServiceItemDto {
   })
   @ValidateIf((item: CreateServiceItemDto) => item.fixedPrice)
   @IsNotEmpty({ message: 'fixedAmount is required when fixedPrice is true' })
-  @IsNumberString()
-  @Matches(/^[1-9]\d*$/, {
-    message: 'fixedAmount must be a positive integer string',
-  })
+  @IsBigIntAmountString()
   fixedAmount?: string;
 
   @IsUUID()
@@ -68,6 +64,60 @@ export class CreateServiceItemDto {
   @IsOptional()
   @IsString()
   taxId?: string | null;
+}
+
+export class UpdateServiceItemDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  fixedPrice?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Fixed amount for this item, in the smallest currency unit. Required when fixedPrice is true.',
+  })
+  @ValidateIf((item: UpdateServiceItemDto) => item.fixedAmount !== undefined)
+  @IsBigIntAmountString()
+  fixedAmount?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  settlementAccountId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Platform tax configuration to apply to this item.',
+  })
+  @IsOptional()
+  @IsString()
+  taxId?: string | null;
+}
+
+export class UpdateServiceDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  serviceName?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether this service can only be initiated via API, not through the public checkout page',
+  })
+  @IsOptional()
+  @IsBoolean()
+  apiInitiationOnly?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  customerPayForListOfItems?: boolean;
 }
 
 export class CreateFormOptionDto {

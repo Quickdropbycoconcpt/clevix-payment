@@ -1,20 +1,13 @@
-import {
-  IsNotEmpty,
-  IsNumberString,
-  IsString,
-  Matches,
-} from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 import type { TransactionType } from 'src/shared/encryption';
+import { IsBigIntAmountString } from 'src/shared/validators/is-bigint-amount-string.validator';
 
 export class PosPaymentIntentDto {
   @IsString()
   @IsNotEmpty()
   pan: string;
 
-  @IsNumberString()
-  @Matches(/^[1-9]\d*$/, {
-    message: 'amount must be a positive integer string',
-  })
+  @IsBigIntAmountString()
   amount: string;
 
   @IsString()

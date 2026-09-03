@@ -6,21 +6,17 @@ import {
   IsNumberString,
   IsOptional,
   IsString,
-  Matches,
 } from 'class-validator';
 import type { TransactionType } from 'src/shared/encryption';
 import { PosChargePurpose } from 'src/shared/enum';
+import { IsBigIntAmountString } from 'src/shared/validators/is-bigint-amount-string.validator';
 
 export class ChargePosDto {
   @IsString()
   @IsNotEmpty()
   pan: string;
 
-  @IsNumberString()
-  @IsNotEmpty()
-  @Matches(/^[1-9]\d*$/, {
-    message: 'amount must be a positive integer string',
-  })
+  @IsBigIntAmountString()
   amount: string;
 
   @IsString()

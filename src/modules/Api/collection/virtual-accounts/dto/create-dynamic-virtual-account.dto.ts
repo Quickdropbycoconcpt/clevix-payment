@@ -6,11 +6,11 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  Matches,
   Max,
   Min,
 } from 'class-validator';
 import { CollectionProvider } from '../../adapters/contracts/collection-adapter.types';
+import { IsBigIntAmountString } from 'src/shared/validators/is-bigint-amount-string.validator';
 
 export class CreateDynamicVirtualAccountDto {
   @ApiProperty({ example: 'Ada Lovelace' })
@@ -24,10 +24,7 @@ export class CreateDynamicVirtualAccountDto {
   customerEmail?: string;
 
   @ApiPropertyOptional({ example: '500000' })
-  @IsString()
-  @Matches(/^[1-9]\d*$/, {
-    message: 'amount must be a positive integer string',
-  })
+  @IsBigIntAmountString()
   amount: string;
 
   @ApiProperty({ example: 'invoice-10001' })

@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -14,7 +15,12 @@ import type { JwtPayload } from 'src/modules/authentication/interface/jwt-payloa
 import { Public } from 'src/modules/authentication/decorators/public.decorator';
 import { getBusinessScope } from 'src/shared/business-scope';
 import type { RequestScope } from 'src/shared/business-scope';
-import { CreateServiceDto } from '../dto/create-service.dto';
+import {
+  CreateServiceDto,
+  CreateServiceItemDto,
+  UpdateServiceDto,
+  UpdateServiceItemDto,
+} from '../dto/create-service.dto';
 import { ServiceCheckout } from '../service/service-checkout.service';
 import { BusinessDashboardAuth } from 'src/modules/authentication/decorators/business-dashboard-auth.decorator';
 
@@ -72,5 +78,50 @@ export class ServiceCheckoutController {
   ) {
     const scope = getBusinessScope(user);
     return this.serviceCheckout.listServices(scope, name);
+  }
+
+  @Patch('services/:serviceId/toggle-status')
+  @BusinessDashboardAuth()
+  async toggleServiceStatus(
+    @Param('serviceId') serviceId: string,
+    @CurrentUser() user: RequestScope,
+  ) {
+    return this.serviceCheckout.toggleServiceStatus(user, serviceId);
+  }
+
+  @Patch('services/:serviceId')
+  @BusinessDashboardAuth()
+  async updateService(
+    @Param('serviceId') serviceId: string,
+    @Body() dto: UpdateServiceDto,
+    @CurrentUser() user: RequestScope,
+  ) {
+    return this.serviceCheckout.updateService(user, serviceId, dto);
+  }
+
+  @Post('services/:serviceId/items')
+  @BusinessDashboardAuth()
+  async addServiceItem(
+    @Param('serviceId') serviceId: string,
+    @Body() dto: CreateServiceItemDto,
+    @CurrentUser() user: RequestScope,
+  ) {
+    return this.serviceCheckout.addServiceItem(user, serviceId, dto);
+  }
+
+  @Patch('services/:serviceId/items/:itemId')
+  @BusinessDashboardAuth()
+  async updateServiceItem(
+    @Param('serviceId') serviceId: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: UpdateServiceItemDto,
+    @CurrentUser() user: RequestScope,
+  ) {
+    return this.serviceCheckout.updateServiceItem(
+      user,
+      serviceId,
+      itemId,
+      dto,
+    );
   }
 }

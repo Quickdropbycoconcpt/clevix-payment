@@ -1,16 +1,8 @@
-import {
-  IsEmail,
-  IsNotEmpty,
-  IsNumberString,
-  IsString,
-  Matches,
-} from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Matches } from 'class-validator';
+import { IsBigIntAmountString } from 'src/shared/validators/is-bigint-amount-string.validator';
 
 export class CardPaymentIntentDto {
-  @IsNumberString()
-  @Matches(/^[1-9]\d*$/, {
-    message: 'amount must be a positive integer string',
-  })
+  @IsBigIntAmountString()
   amount: string;
 
   @IsEmail()

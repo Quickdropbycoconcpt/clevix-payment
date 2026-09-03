@@ -4,6 +4,7 @@ import { AxiosRequestConfig } from 'axios';
 import { RequestEnvironment } from './enum';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { randomInt } from 'crypto';
+import { POSTGRES_BIGINT_MAX } from './validators/is-bigint-amount-string.validator';
 
 export type IntegerAmount = string | number | bigint;
 export type DecimalValue = string | number;
@@ -27,6 +28,8 @@ export const toIntegerAmountString = (
       throw new BadRequestException(`${fieldName} cannot be negative`);
     }
 
+    assertWithinBigIntRange(amount, fieldName);
+
     return amount.toString();
   }
 
@@ -49,7 +52,17 @@ export const toIntegerAmountString = (
     throw new BadRequestException(`${fieldName} must be an integer string`);
   }
 
+  assertWithinBigIntRange(BigInt(trimmedAmount), fieldName);
+
   return trimmedAmount;
+};
+
+const assertWithinBigIntRange = (amount: bigint, fieldName: string): void => {
+  const absAmount = amount < 0n ? -amount : amount;
+
+  if (absAmount > POSTGRES_BIGINT_MAX) {
+    throw new BadRequestException(`${fieldName} is out of range`);
+  }
 };
 
 export const toIntegerAmountBigInt = (

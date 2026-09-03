@@ -4,14 +4,13 @@ import {
   ArrayMinSize,
   IsArray,
   IsNotEmpty,
-  IsNumberString,
   IsObject,
   IsOptional,
   IsString,
   IsUUID,
-  Matches,
   ValidateNested,
 } from 'class-validator';
+import { IsBigIntAmountString } from 'src/shared/validators/is-bigint-amount-string.validator';
 
 export class SelectedInvoiceItemDto {
   @IsUUID()
@@ -23,10 +22,7 @@ export class SelectedInvoiceItemDto {
       'Amount for this item, in the smallest currency unit. Required when the item does not use a fixed price.',
   })
   @IsOptional()
-  @IsNumberString()
-  @Matches(/^[1-9]\d*$/, {
-    message: 'amount must be a positive integer string',
-  })
+  @IsBigIntAmountString()
   amount?: string;
 }
 

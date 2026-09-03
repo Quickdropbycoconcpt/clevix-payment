@@ -41,3 +41,17 @@ export type CreateService = {
   customForms: CreateCustomForm[];
   items: CreateServiceItem[];
 };
+
+export type UpdateServiceItem = {
+  name?: string;
+  fixedPrice?: boolean;
+  fixedAmount?: string;
+  settlementAccountId?: string;
+  taxId?: string | null;
+};
+
+export type UpdateService = {
+  serviceName?: string;
+  apiInitiationOnly?: boolean;
+  customerPayForListOfItems?: boolean;
+};
