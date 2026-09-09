@@ -45,6 +45,8 @@ import {
 } from 'src/shared/constants/invoice.constants';
 import { TaxManagementService } from 'src/modules/tax-management/service/tax-management.service';
 import { generateRrn } from 'src/shared/utils';
+import { getBusinessScope, RequestScope } from 'src/shared/business-scope';
+import { createOffsetPaginatedResponse } from 'src/shared/http/pagination';
 
 type ResolvedInvoiceItem = {
   itemId: string;
@@ -67,6 +69,8 @@ export class OrganisationInvoiceService {
     @InjectRepository(Businesses)
     private readonly businessRepo: Repository<Businesses>,
     private readonly taxManagementService: TaxManagementService,
+    @InjectRepository(InvoicePaymentTransaction)
+    private readonly invoiceTransactionRepo: Repository<InvoicePaymentTransaction>,
   ) {}
 
   async createInvoice(input: CreateInvoice) {
@@ -504,6 +508,58 @@ export class OrganisationInvoiceService {
     }
 
     return this.feeService.computeFee(invoice, method);
+  }
+
+  async listInvoices(
+    scope: RequestScope,
+    filters: { status?: InvoiceStatus; reference?: string },
+  ) {
+    const { businessId, environment, pagination } = getBusinessScope(scope);
+
+    const query = this.invoiceRepo
+      .createQueryBuilder('invoice')
+      .where('invoice.businessId = :businessId', { businessId })
+      .andWhere('invoice.environment = :environment', { environment })
+      .orderBy('invoice.createdAt', 'DESC')
+      .skip(pagination.skip)
+      .take(pagination.take);
+
+    if (filters.status) {
+      query.andWhere('invoice.status = :status', { status: filters.status });
+    }
+
+    if (filters.reference?.trim()) {
+      query.andWhere(
+        '(invoice.reference ILIKE :reference OR invoice.merchantReference ILIKE :reference)',
+        { reference: `%${filters.reference.trim()}%` },
+      );
+    }
+
+    const [invoices, total] = await query.getManyAndCount();
+
+    return createOffsetPaginatedResponse(invoices, pagination, { total });
+  }
+
+  async listInvoiceTransactions(scope: RequestScope, reference: string) {
+    const { businessId, environment, pagination } = getBusinessScope(scope);
+
+    const invoice = await this.invoiceRepo.findOne({
+      where: { reference: reference.trim(), businessId, environment },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    const [transactions, total] =
+      await this.invoiceTransactionRepo.findAndCount({
+        where: { invoice: { invoiceId: invoice.invoiceId } },
+        order: { createdAt: 'DESC' },
+        skip: pagination.skip,
+        take: pagination.take,
+      });
+
+    return createOffsetPaginatedResponse(transactions, pagination, { total });
   }
 
   async payInvoice(input: PayInvoice) {
