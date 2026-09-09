@@ -84,7 +84,7 @@ export class OrganisationInvoiceService {
 
     const paymentRule = this.getInvoicePaymentRule(service);
     const resolvedItems = await this.resolveInvoiceItems(service, input.items);
-    if (input.items.length > 0) {
+    if (input.items.length > 1) {
       /***We are limiting one invoice to a single item
        * This is to ensure easier accounting for businesses.
        */
