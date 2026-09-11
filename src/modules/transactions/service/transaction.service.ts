@@ -71,7 +71,8 @@ export type UpdateTransactionInput = Partial<
 
 export type GetTransactionStatusInput = {
   reference: string;
-  businessId: string;
+  businessId?: string | null;
+  environment?: string | null;
 };
 
 export type TransactionStatusResponse = {
@@ -288,20 +289,28 @@ export class TransactionService {
   ): Promise<TransactionStatusResponse> {
     const reference = input.reference?.trim();
     const businessId = input.businessId?.trim();
+    const environment = input.environment?.trim();
 
     if (!reference) {
       throw new BadRequestException('Transaction reference is required');
     }
 
-    if (!businessId) {
-      throw new BadRequestException('businessId is required');
+    if (!businessId || !environment) {
+      throw new BadRequestException('Invalid transaction status request scope');
     }
 
     const transaction = await this.transactionRepo
       .createQueryBuilder('txn')
-      .where('txn.merchantReference = :reference', { reference })
-      .andWhere('txn.businessId = :businessId', { businessId })
+      .where('txn.businessId = :businessId', { businessId })
+      .andWhere('txn.environment = :environment', { environment })
       .andWhere('txn.deletedAt IS NULL')
+      .andWhere(
+        new Brackets((qb) => {
+          qb.where('txn.reference = :reference', { reference })
+            .orWhere('txn.merchantReference = :reference', { reference })
+            .orWhere('txn.providerReference = :reference', { reference });
+        }),
+      )
       .orderBy('txn.createdAt', 'DESC')
       .getOne();
 
