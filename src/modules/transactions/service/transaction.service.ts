@@ -288,27 +288,14 @@ export class TransactionService {
     input: GetTransactionStatusInput,
   ): Promise<TransactionStatusResponse> {
     const reference = input.reference?.trim();
-    const businessId = input.businessId?.trim();
-    const environment = input.environment?.trim();
 
     if (!reference) {
       throw new BadRequestException('Transaction reference is required');
     }
-
-    if (!businessId || !environment) {
-      throw new BadRequestException('Invalid transaction status request scope');
-    }
-
     const transaction = await this.transactionRepo
       .createQueryBuilder('txn')
-      .where('txn.businessId = :businessId', { businessId })
-      .andWhere('txn.environment = :environment', { environment })
+      .where('txn.merchantReference = :merchantReference', { reference })
       .andWhere('txn.deletedAt IS NULL')
-      .andWhere(
-        new Brackets((qb) => {
-          qb.where('txn.merchantReference = :reference', { reference });
-        }),
-      )
       .orderBy('txn.createdAt', 'DESC')
       .getOne();
 

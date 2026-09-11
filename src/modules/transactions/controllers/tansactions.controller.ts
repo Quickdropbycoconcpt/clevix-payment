@@ -18,14 +18,9 @@ export class TransactionsController {
 
   @Public()
   @Get('status/:reference')
-  async getTransactionStatusByReference(
-    @Param('reference') reference: string,
-    @CurrentUser() user: JwtPayload,
-  ) {
+  async getTransactionStatusByReference(@Param('reference') reference: string) {
     return this.transactionService.getTransactionStatus({
       reference,
-      businessId: user.businessId,
-      environment: user.environment,
     });
   }
 }
