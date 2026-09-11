@@ -71,6 +71,8 @@ export class OrganisationInvoiceService {
     private readonly taxManagementService: TaxManagementService,
     @InjectRepository(InvoicePaymentTransaction)
     private readonly invoiceTransactionRepo: Repository<InvoicePaymentTransaction>,
+    @InjectRepository(InvoiceItem)
+    private readonly invoiceItemRepo: Repository<InvoiceItem>,
   ) {}
 
   async createInvoice(input: CreateInvoice) {
@@ -537,7 +539,37 @@ export class OrganisationInvoiceService {
 
     const [invoices, total] = await query.getManyAndCount();
 
-    return createOffsetPaginatedResponse(invoices, pagination, { total });
+    const items = invoices.length
+      ? await this.invoiceItemRepo.find({
+          where: {
+            invoiceId: In(invoices.map((invoice) => invoice.invoiceId)),
+          },
+          relations: { item: true },
+        })
+      : [];
+
+    const itemsByInvoiceId = new Map<string, InvoiceItem[]>();
+    for (const item of items) {
+      const invoiceItems = itemsByInvoiceId.get(item.invoiceId) ?? [];
+      invoiceItems.push(item);
+      itemsByInvoiceId.set(item.invoiceId, invoiceItems);
+    }
+
+    const invoicesWithItems = invoices.map((invoice) => ({
+      ...invoice,
+      items: (itemsByInvoiceId.get(invoice.invoiceId) ?? []).map((item) => ({
+        itemId: item.itemId,
+        name: item.item?.name,
+        amount: item.amount,
+        baseAmount: item.baseAmount,
+        taxAmount: item.taxAmount,
+        taxId: item.taxId,
+      })),
+    }));
+
+    return createOffsetPaginatedResponse(invoicesWithItems, pagination, {
+      total,
+    });
   }
 
   async listInvoiceTransactions(scope: RequestScope, reference: string) {
