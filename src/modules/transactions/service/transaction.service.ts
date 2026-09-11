@@ -303,12 +303,10 @@ export class TransactionService {
       .createQueryBuilder('txn')
       .where('txn.businessId = :businessId', { businessId })
       .andWhere('txn.environment = :environment', { environment })
-      .andWhere('txn.deleteAt IS NULL')
+      .andWhere('txn.deletedAt IS NULL')
       .andWhere(
         new Brackets((qb) => {
-          qb.where('txn.reference = :reference', { reference })
-            .orWhere('txn.merchantReference = :reference', { reference })
-            .orWhere('txn.providerReference = :reference', { reference });
+          qb.where('txn.merchantReference = :reference', { reference });
         }),
       )
       .orderBy('txn.createdAt', 'DESC')
