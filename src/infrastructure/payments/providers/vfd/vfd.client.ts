@@ -205,6 +205,7 @@ export class VfdClient {
         track2Data,
       } = input;
       const credentials = this.credentialPicker(input.environment);
+      console.log(credentials);
       const username = credentials.pos_auth_username;
       const password = credentials.pos_auth_password;
       const encodedbase64 = base64Encoded(`${username}:${password}`);

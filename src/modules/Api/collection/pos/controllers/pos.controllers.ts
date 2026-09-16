@@ -67,4 +67,10 @@ export class PosController {
   ) {
     return this.posService.incomingWebhook(body, provider);
   }
+
+  @Public()
+  @Post('mf/test-pay')
+  async testTerminal(@Body() body: any) {
+    console.log(body);
+  }
 }
