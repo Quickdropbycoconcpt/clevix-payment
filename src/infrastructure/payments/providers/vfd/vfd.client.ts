@@ -238,7 +238,7 @@ export class VfdClient {
         cardExpiryDate,
         acquiringInstitutionalCode: '53998359',
         sequenceNumber,
-        pin,
+        // pin,
         accountType,
         type: 'CARD',
         transactionCurrency: 'NAIRA',
