@@ -205,7 +205,7 @@ export class VfdClient {
         track2Data,
       } = input;
       const credentials = this.credentialPicker(input.environment);
-      console.log(credentials);
+
       const username = credentials.pos_auth_username;
       const password = credentials.pos_auth_password;
       const encodedbase64 = base64Encoded(`${username}:${password}`);
@@ -276,7 +276,7 @@ export class VfdClient {
         currency,
       };
     } catch (error: any) {
-      console.log(error);
+      this.logger.fatal(error.message);
       throw new BadRequestException(error.message);
     }
   }
@@ -582,7 +582,7 @@ export class VfdClient {
         accountNumber: response.data.data.accountNo,
       };
     } catch (error: any) {
-      console.log(error);
+      console.log(error.response.data.message);
       throw new BadRequestException(error.response.data.message, error);
     }
   }
