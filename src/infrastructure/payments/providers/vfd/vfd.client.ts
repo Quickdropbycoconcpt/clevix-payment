@@ -276,6 +276,7 @@ export class VfdClient {
         currency,
       };
     } catch (error: any) {
+      console.log(error);
       throw new BadRequestException(error.message);
     }
   }
