@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SettlementBankAccounts } from './entity/settlement_accounts.entity';
 import { SettlementController } from './controller/settlement.controller';
+import { SettlementTransactionsController } from './controller/settlement-transactions.controller';
 import { SettlementService } from './service/settlement.account.service';
 import { SettlementTransactions } from './entity/settlement_transactions.entity';
 import { BusinessSettlementConfig } from './entity/business_settlement_config.entity';
@@ -48,7 +49,7 @@ import { LedgerModule } from '../ledger/ledger.module';
     TransactionFeesModule,
     LedgerModule,
   ],
-  controllers: [SettlementController],
+  controllers: [SettlementController, SettlementTransactionsController],
   providers: [
     SettlementService,
     BusinessSettlementConfigurationService,

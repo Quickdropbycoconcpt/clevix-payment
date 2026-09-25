@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, IsNull, Repository } from 'typeorm';
 import { IncomingPaymentSource } from 'src/shared/enum';
@@ -9,6 +9,11 @@ import {
 import { BusinessSettlementType } from '../entity/business_settlement_config.entity';
 import { SettlementTransactionItems } from '../entity/settlement_transaction_items.entity';
 import { Settlements } from '../entity/settlements.entity';
+import { SettlementBankAccounts } from '../entity/settlement_accounts.entity';
+import { getBusinessScope, RequestScope } from 'src/shared/business-scope';
+import { createOffsetPaginatedResponse } from 'src/shared/http/pagination';
+import { ListSettlementsQueryDto } from '../dto/list-settlements-query.dto';
+import { parseDateRange } from 'src/shared/http/date-range';
 
 type UpsertUnsettledBucketInput = {
   businessId: string;
@@ -224,5 +229,69 @@ export class SettlementTransactionsService {
         metadata: input.metadata ?? null,
       }),
     );
+  }
+
+  async listSettlements(scope: RequestScope, filters: ListSettlementsQueryDto) {
+    const { businessId, environment, pagination } = getBusinessScope(scope);
+
+    const query = this.settlementRepo
+      .createQueryBuilder('settlement')
+      .where('settlement.businessId = :businessId', { businessId })
+      .andWhere('settlement.environment = :environment', { environment })
+      .orderBy('settlement.settlementDate', 'DESC')
+      .addOrderBy('settlement.createdAt', 'DESC')
+      .skip(pagination.skip)
+      .take(pagination.take);
+
+    if (filters.status) {
+      query.andWhere('settlement.status = :status', {
+        status: filters.status,
+      });
+    }
+
+    const { from, to } = parseDateRange(filters);
+    if (from) {
+      query.andWhere('settlement.settlementDate >= :from', { from });
+    }
+    if (to) {
+      query.andWhere('settlement.settlementDate <= :to', { to });
+    }
+
+    const [settlements, total] = await query.getManyAndCount();
+
+    return createOffsetPaginatedResponse(settlements, pagination, { total });
+  }
+
+  async listSettlementTransactions(scope: RequestScope, settlementId: string) {
+    const { businessId, environment, pagination } = getBusinessScope(scope);
+
+    const settlement = await this.settlementRepo.findOne({
+      where: { settlementId: settlementId.trim(), businessId, environment },
+    });
+
+    if (!settlement) {
+      throw new NotFoundException('Settlement not found');
+    }
+
+    const [transactions, total] = await this.settlementTxnRepo
+      .createQueryBuilder('txn')
+      .where('txn.settlementId = :settlementId', {
+        settlementId: settlement.settlementId,
+      })
+      .andWhere('txn.businessId = :businessId', { businessId })
+      .andWhere('txn.environment = :environment', { environment })
+      .leftJoinAndMapOne(
+        'txn.settlementBankAccount',
+        SettlementBankAccounts,
+        'bankAccount',
+        'bankAccount.bankAccountId = txn.settlementbankAccountId',
+      )
+      .leftJoinAndSelect('bankAccount.bank', 'bank')
+      .orderBy('txn.createdAt', 'DESC')
+      .skip(pagination.skip)
+      .take(pagination.take)
+      .getManyAndCount();
+
+    return createOffsetPaginatedResponse(transactions, pagination, { total });
   }
 }
