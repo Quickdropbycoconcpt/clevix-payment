@@ -276,7 +276,7 @@ export class VfdClient {
         currency,
       };
     } catch (error: any) {
-      this.logger.fatal(error.message);
+      this.logger.fatal(error.response.data.message);
       throw new BadRequestException(error.message);
     }
   }
@@ -374,7 +374,7 @@ export class VfdClient {
 
       return response;
     } catch (error) {
-      console.log(error);
+      this.logger.fatal(error?.response?.data.message);
       throw new BadRequestException(
         'Unable to generate payment account',
         error,
