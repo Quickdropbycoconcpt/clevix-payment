@@ -374,7 +374,7 @@ export class VfdClient {
 
       return response;
     } catch (error) {
-      this.logger.fatal(error?.response?.data.message);
+      this.logger.fatal(error);
       throw new BadRequestException(
         'Unable to generate payment account',
         error,
