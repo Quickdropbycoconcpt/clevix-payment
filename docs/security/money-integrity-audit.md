@@ -44,7 +44,7 @@ There is no re-check against the provider's own transaction-status API before cr
 
 ---
 
-### 2. Virtual account webhook trusts `amount` and `account_number` straight from the request body
+### 2. ~~Virtual account webhook trusts `amount` and `account_number` straight from the request body~~ — FIXED 2026-09-30
 
 **Files:**
 - [virtual-accounts.controllers.ts:47-50](../../src/modules/Api/collection/virtual-accounts/controllers/virtual-accounts.controllers.ts#L47-L50) — `@Public() @Post(':provider/webhook')`
@@ -75,11 +75,13 @@ Every one of these fields — including `amount` and `account_number` — comes 
 
 **Fix direction:** same as finding 1 — provider signature verification is non-negotiable on both webhook endpoints before anything in the body is trusted enough to move money.
 
+**Status:** fixed. `incomingWebhook` now calls `checkProviderHeader(apiKey, provider)` before touching the DB or queuing a credit job. It rejects unknown providers, and for `vfd` it requires `x-api-key` to match `VFD_EXPECTED_INTERNAL_KEY` — throwing (not silently returning) on a missing env var or a mismatched key, so a misconfigured deployment fails closed rather than open. The controller passes the header through and logs it ([virtual-accounts.controllers.ts](../../src/modules/Api/collection/virtual-accounts/controllers/virtual-accounts.controllers.ts)). Confirm `x-api-key` is genuinely the field VFD signs (not just an arbitrary header we invented) and that `VFD_EXPECTED_INTERNAL_KEY` is set in every deployed environment before treating this as closed in production.
+
 ---
 
 ## High
 
-### 3. Virtual-account "simulate credit" endpoint has no ownership check — any merchant can credit any other merchant's account
+### 3. ~~Virtual-account "simulate credit" endpoint has no ownership check — any merchant can credit any other merchant's account~~ — FIXED 2026-09-30
 
 **Files:**
 - [virtual-accounts.controllers.ts:42-45](../../src/modules/Api/collection/virtual-accounts/controllers/virtual-accounts.controllers.ts#L42-L45) — `@Post('credit') simulateCredit(@Body() dto)`
@@ -105,6 +107,10 @@ async simulateCredit(input: SimulateInwardCreditDto) {
 Any authenticated merchant can call this with any other merchant's virtual/static account number. It hardcodes `environment: RequestEnvironment.TEST` when calling the adapter, which presumably tells VFD to simulate the inbound transfer on their sandbox rather than moving real money — I did not verify VFD's side of this, so I can't rule out that this only affects `TEST`-environment balances. Even scoped to `TEST`, the missing ownership check means one merchant can pollute another merchant's test-environment wallet, which is still a real cross-tenant bug and worth closing, and it sits directly upstream of finding 2's webhook (VFD's sandbox will presumably call back into the same public, unsigned webhook once the simulated credit "arrives").
 
 **Fix direction:** load the target account's `businessId` and compare it against the caller's scope before calling the adapter; reject with 403/404 on mismatch, the same way `updateService`/`updateServiceItem` in the service-checkout module scope by `businessId` before allowing a mutation.
+
+**Status:** fixed, in two parts:
+- The controller now passes `@CurrentUser()` through to `simulateCredit`, and the service compares the resolved account's `businessId` against the caller's own `businessId`, rejecting with the exact same `BadRequestException('Invalid request')` used for "account doesn't exist at all" — same status code, same message — so there's no oracle distinguishing "not yours" from "doesn't exist."
+- Independently, `targetEnvironment !== RequestEnvironment.TEST` is now also checked and rejected before calling the adapter. This was verified, not assumed: `simulateInWardVirtualCredit` in `vfd.client.ts` always resolves credentials via `credentialPicker(RequestEnvironment.TEST)`, so the outbound call to VFD only ever uses dev/sandbox credentials — but the account-number *lookup* on our side previously had no environment filter, meaning it would resolve a real LIVE account's row and pass its real account number to VFD's sandbox. Whatever VFD's sandbox does with an unrecognized live account number wasn't something I could verify externally, so the fix closes it on our side regardless: the endpoint now refuses to act on anything but a `TEST`-environment account.
 
 ---
 

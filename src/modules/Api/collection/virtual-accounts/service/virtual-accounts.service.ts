@@ -181,7 +181,9 @@ export class VirtualAccountsService {
     return result.affected ?? 0;
   }
 
-  async simulateCredit(input: SimulateInwardCreditDto) {
+  async simulateCredit(input: SimulateInwardCreditDto, scope: RequestScope) {
+    const { businessId } = getBusinessScope(scope);
+
     let walletAccount: StaticWalletAccounts;
     const dva = await this.dvaRepo.findOne({
       where: { accountNumber: input.accountNumber, status: BasicStatus.ACTIVE },
@@ -194,6 +196,18 @@ export class VirtualAccountsService {
 
     if (!walletAccount && !dva) {
       throw new BadRequestException('Invalid request');
+    }
+
+    const ownerBusinessId = dva?.businessId ?? walletAccount?.businessId;
+    if (ownerBusinessId !== businessId) {
+      throw new BadRequestException('Invalid request');
+    }
+
+    const targetEnvironment = dva?.environment ?? walletAccount?.environment;
+    if (targetEnvironment !== RequestEnvironment.TEST) {
+      throw new BadRequestException(
+        'Credit simulation is only available for TEST accounts',
+      );
     }
 
     const adapter = this.collectionAdapterFactory.getVirtualAccountAdapter(
@@ -377,11 +391,13 @@ export class VirtualAccountsService {
       };
     } catch (error) {
       this.logger.fatal(error.message);
+      throw error;
     }
   }
 
   private async checkProviderHeader(incomingHeader: string, provider: string) {
-    if (provider != 'vfd') {
+    const supportedProviders = ['vfd'];
+    if (!supportedProviders.includes(provider)) {
       throw new BadRequestException(`Please provide ${provider} signature`);
     }
 

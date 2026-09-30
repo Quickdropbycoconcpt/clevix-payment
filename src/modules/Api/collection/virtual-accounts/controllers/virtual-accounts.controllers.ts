@@ -56,8 +56,11 @@ export class VirtualAccountsController {
   }
 
   @Post('credit')
-  async simulateCredit(@Body() dto: SimulateInwardCreditDto) {
-    return this.virtualAccountsService.simulateCredit(dto);
+  async simulateCredit(
+    @Body() dto: SimulateInwardCreditDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.virtualAccountsService.simulateCredit(dto, user);
   }
 
   @Public()
@@ -67,8 +70,6 @@ export class VirtualAccountsController {
     @Param('provider') provider: string,
     @Headers('x-api-key') apiKey: string,
   ) {
-    this.logger.log(`Virtual account webhook x-api-key: ${apiKey}`);
-
     return this.virtualAccountsService.incomingWebhook(dto, provider, apiKey);
   }
 }
