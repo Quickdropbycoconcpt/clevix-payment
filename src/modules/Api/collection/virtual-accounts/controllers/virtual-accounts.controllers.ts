@@ -1,4 +1,12 @@
-import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Headers,
+  Logger,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from 'src/modules/authentication/decorators/current-user.decorator';
 import { ApiJwtAuthGuard } from 'src/modules/authentication/guards/api-guard';
@@ -17,6 +25,8 @@ import {
 @ApiBearerAuth('bearer')
 @UseGuards(ApiJwtAuthGuard)
 export class VirtualAccountsController {
+  private readonly logger = new Logger(VirtualAccountsController.name);
+
   constructor(
     private readonly virtualAccountsService: VirtualAccountsService,
   ) {}
@@ -52,7 +62,13 @@ export class VirtualAccountsController {
 
   @Public()
   @Post(':provider/webhook')
-  async webHook(@Body() dto: any, @Param('provider') provider: string) {
+  async webHook(
+    @Body() dto: any,
+    @Param('provider') provider: string,
+    @Headers('x-api-key') apiKey: string,
+  ) {
+    this.logger.log(`Virtual account webhook x-api-key: ${apiKey}`);
+
     return this.virtualAccountsService.incomingWebhook(dto, provider);
   }
 }

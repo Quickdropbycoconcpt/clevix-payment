@@ -38,7 +38,6 @@ export class BanksService {
     }));
   }
 
-  @Cron(CronExpression.EVERY_10_MINUTES)
   async syncBanksFromProvider(): Promise<void> {
     const adapter = this.banksAdapterFactory.getBankAdapter(BankProvider.VFD);
     const providerBanks = await adapter.getBanks();
