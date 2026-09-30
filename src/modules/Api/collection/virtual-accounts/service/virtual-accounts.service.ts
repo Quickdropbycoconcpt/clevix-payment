@@ -3,6 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { CollectionAdapterFactory } from '../../adapters/collection.adapter.factory';
@@ -312,7 +313,7 @@ export class VirtualAccountsService {
     provider: string,
     apiKey: string,
   ): Promise<VirtualAccountCreditResponse> {
-    await this.checkProviderHeader(apiKey, provider);
+    this.checkProviderHeader(apiKey, provider);
     const adapter =
       this.collectionAdapterFactory.getVirtualAccountAdapter(provider);
     const result = adapter.incomingPaymentWebhook(body);
@@ -373,13 +374,16 @@ export class VirtualAccountsService {
     };
   }
 
-  private async checkProviderHeader(incomingHeader: string, provider: string) {
-    if (
-      provider == 'vfd' &&
-      incomingHeader !== process.env.VFD_EXPECTED_INTERNAL_KEY
-    ) {
-      return;
+  private checkProviderHeader(incomingHeader: string, provider: string) {
+    if (provider != 'vfd') {
+      throw new BadRequestException(`Please provide ${provider} signature`);
     }
-    this.logger.log('vfd passed');
+
+    const expectedKey = process.env.VFD_EXPECTED_INTERNAL_KEY;
+
+    if (!expectedKey || incomingHeader !== expectedKey) {
+      throw new UnauthorizedException('Invalid webhook credentials');
+    }
+    this.logger.log('Header passed process');
   }
 }
