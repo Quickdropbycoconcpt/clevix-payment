@@ -69,6 +69,6 @@ export class VirtualAccountsController {
   ) {
     this.logger.log(`Virtual account webhook x-api-key: ${apiKey}`);
 
-    return this.virtualAccountsService.incomingWebhook(dto, provider);
+    return this.virtualAccountsService.incomingWebhook(dto, provider, apiKey);
   }
 }

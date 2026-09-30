@@ -310,7 +310,9 @@ export class VirtualAccountsService {
   async incomingWebhook(
     body: any,
     provider: string,
+    apiKey: string,
   ): Promise<VirtualAccountCreditResponse> {
+    await this.checkProviderHeader(apiKey, provider);
     const adapter =
       this.collectionAdapterFactory.getVirtualAccountAdapter(provider);
     const result = adapter.incomingPaymentWebhook(body);
@@ -371,5 +373,13 @@ export class VirtualAccountsService {
     };
   }
 
-  
+  private async checkProviderHeader(incomingHeader: string, provider: string) {
+    if (
+      provider == 'vfd' &&
+      incomingHeader !== process.env.VFD_EXPECTED_INTERNAL_KEY
+    ) {
+      return;
+    }
+    this.logger.log('vfd passed');
+  }
 }
