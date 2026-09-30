@@ -134,7 +134,50 @@ settlementBankAccount: SettlementBankAccounts;
 
 The actual column is `settlementbankAccountId` (see the v3 migration, which explicitly drops `providerbankId` from this table and adds the FK on `settlementbankAccountId` instead: [1786483469264-v3.ts:8-15](../../src/infrastructure/database/migrations/1786483469264-v3.ts#L8-L15)). The `@JoinColumn` still points at the old, now-nonexistent-as-a-real-value `providerbankId`, so this relation resolves to `null` for every row. [settlement.processor.ts:33-72](../../src/modules/settlement-management/jobs/settlement.processor.ts#L33-L72) loads this relation to look up the destination bank account for a payout and, seeing it null, logs a warning and returns early rather than paying out. This isn't a money-creation bug — if anything it fails closed (no payout happens) — but it means **outbound settlement payouts to bank accounts may not be running at all**, which is worth confirming against production logs for the `Settlement bank account ... was not found` warning. I patched around this at the query level for the new settlement-listing endpoints (joining explicitly on `settlementbankAccountId`), but the entity itself is still broken for whatever code relies on the ORM relation.
 
-### 6. Pattern to keep watching for: missing business/environment scoping on listing and lookup endpoints
+### 6. No refund/reversal path on a failed payout — money can be debited and never sent, with no automatic recovery
+
+**Files:**
+- [transfer.service.ts:16-57](../../src/modules/Api/transfers/service/transfer.service.ts#L16-L57) — `processPayout`
+- [transfer-payout-proccessor.ts:20-46](../../src/modules/Api/transfers/job/transfer-payout-proccessor.ts#L20-L46) — the payout worker
+
+This came up while checking the opposite direction from findings 1–3: whether a merchant could *withdraw* more than they actually have. That specific question checked out clean — see below — but this fell out of the same review and is worth recording, since it's a real bug even though it isn't an exploit.
+
+On failure, the worker only does this:
+
+```ts
+} catch (error) {
+  if (jobData.walletTransactionId) {
+    await this.walletTransactionRepo.update(
+      { walletTransactionId: jobData.walletTransactionId },
+      { status: WalletTransactionStatus.FAILED, message: ... },
+    );
+  }
+  throw error;
+}
+```
+
+The wallet was already debited in `processPayout`, before the job was even queued (correct ordering for preventing overdraft — see below). But when the actual bank transfer fails, nothing re-credits that amount back to the wallet. A grep across `transfers`, `wallets`, and `settlement-management` for `refund`/`reversal`/`reverse` turned up nothing. So a merchant can end up with money that's neither in their wallet nor at their bank, with no automatic path back. This is a money-loss bug for legitimate users, not a way to get extra money — flagging it here because it's adjacent to the same code path and because "no automatic refund" also means there's no refund mechanism to abuse for double-dipping (can't get refunded for a payout that also secretly succeeded, since nothing refunds automatically at all).
+
+**Fix direction:** on `WalletTransactionStatus.FAILED`, credit the wallet back for the debited amount, scoped by the same reference so it can't be triggered twice for one failure.
+
+### 7. Withdrawal path (overdraft / double-spend check) — no hole found
+
+**Files:** [transfer.service.ts:16-57](../../src/modules/Api/transfers/service/transfer.service.ts#L16-L57), [wallets.service.ts:441-517](../../src/modules/wallets/service/wallets.service.ts#L441-L517), [transfer-queue-job.ts:27-46](../../src/modules/Api/transfers/job/transfer-queue-job.ts#L27-L46)
+
+Checked whether a merchant could withdraw more than their actual wallet balance. Nothing found:
+
+- `debitUserWallet` runs inside a DB transaction with a pessimistic write lock on the wallet row, plus a redundant SQL-level guard (`.andWhere('balance >= :amount', ...)` on the `UPDATE`), plus an idempotency key (`wallet-debit:{businessId}:{reference}`) checked both before and inside the transaction. Replaying the same withdrawal request can't double-debit, and the SQL guard means the balance can't go negative even if the lock logic had a gap.
+- The wallet is debited *before* the payout job is queued, so there's no window where a transfer goes out without the balance already being reserved.
+- The queue adds `jobId: input.reference` (BullMQ dedupes by job id) and `attempts: 1` (no automatic retry), so the payout worker itself can't process one withdrawal request twice.
+
+**Not verified, flagged rather than assumed safe:**
+- The settlement engine's separate payout-to-bank-account path (`settlement.engine.service.ts`) — only its reconciliation step (`transactionStatusQuery` → mark settled) was glanced at; the aggregation math deciding how much a settlement bucket pays out was not verified for double-counting.
+- Fee computation (`getFeeBySource`) — whether `source`/`provider` can be manipulated by the caller to reduce the fee charged on a withdrawal, netting more than intended for the same requested amount.
+- Any wallet-to-wallet internal transfer feature, if one exists — not located or reviewed this pass.
+
+---
+
+### 8. Pattern to keep watching for: missing business/environment scoping on listing and lookup endpoints
 
 Earlier in this workstream I found and fixed one instance of this: `GET /v1/dashboard/transactions` had no `businessId`/`environment` filter at all, returning every business's transactions to any authenticated dashboard user (fixed in `list-transactions.service.ts`). I did not do an exhaustive sweep of every controller for the same class of bug (missing `getBusinessScope`/`andWhere('businessId = ...')` on a query), but given this exact bug was found once already, I'd treat it as a pattern rather than a one-off, and check every `@Get`/`@Post` handler that reads or writes by an ID for a missing ownership check, not just the ones this session happened to touch. It's very rarely about the SQL WHERE clause — it's about an ID resolved from a URL param or body **before** confirming it belongs to the caller.
 
@@ -143,16 +186,17 @@ Earlier in this workstream I found and fixed one instance of this: `GET /v1/dash
 ## Not covered in this pass
 
 - Live/sandbox verification of any of the above (no requests were sent anywhere)
-- Refund/reversal flows for failed disbursements — the settlement engine's T+1 vs instant payout design was flagged elsewhere as not yet fully implemented; if/when reversal-on-failure crediting is added, it should be checked for the same "trust the callback" pattern as findings 1–2
-- A full sweep of every controller for the business-scoping gap described in finding 6 — only the transactions listing was checked and fixed
-- Ledger double-entry invariants beyond the wallet debit path in `wallets.service.ts` (which does look correctly guarded: pessimistic lock + a `WHERE balance >= amount` guard at the SQL level + idempotency key, see `debitUserWallet`)
+- The settlement engine's payout-to-bank-account aggregation math (finding 7) — not verified for double-counting or over-paying a settlement bucket
+- Fee computation (`getFeeBySource`) — whether `source`/`provider` can be manipulated to reduce a withdrawal's fee (finding 7)
+- A full sweep of every controller for the business-scoping gap described in finding 8 — only the transactions listing was checked and fixed
 - Rate limiting / brute-force protection on any endpoint (out of scope for "fake money" but adjacent)
-- Anything in the tax-management, wallets-to-wallets transfer, or business-members/permissions modules — not reviewed this pass
+- Anything in the tax-management, wallets-to-wallets transfer (if one exists), or business-members/permissions modules — not reviewed this pass
 
 ## Priority order to fix
 
-1. Sign and verify both the card and virtual-account provider webhooks (findings 1–2) — everything else is secondary until these are closed, since they're live, unauthenticated money-creation endpoints.
-2. Add the ownership check to `simulateCredit` (finding 3).
+1. ~~Sign and verify both the card and virtual-account provider webhooks (findings 1–2)~~ — finding 2 fixed 2026-09-30; finding 1 (card) still open, plan agreed (secret embedded in the webhook URL's query string, since the provider won't support custom headers) but not yet implemented.
+2. ~~Add the ownership check to `simulateCredit` (finding 3)~~ — fixed 2026-09-30.
 3. Confirm whether settlement payouts are actually running given finding 5, then fix the entity's `@JoinColumn`.
-4. Sign the POS webhook for reconciliation integrity (finding 4).
-5. Sweep for the scoping pattern in finding 6.
+4. Add a refund/reversal path for failed payouts (finding 6) — money-loss bug, not an exploit, but real.
+5. Sign the POS webhook for reconciliation integrity (finding 4).
+6. Sweep for the scoping pattern in finding 8.

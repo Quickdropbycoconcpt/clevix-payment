@@ -19,6 +19,7 @@ import {
 import { Between, EntityManager, IsNull, Repository } from 'typeorm';
 import { JwtPayload } from 'src/modules/authentication/interface/jwt-payload.interface';
 import { CreateWebhookDto } from '../dto/webhook.dto';
+import { assertPublicHttpUrl } from 'src/shared/http/ssrf-guard';
 import { WebhooksSnapshot } from '../entity/webhook_snapshot.entity';
 import { Webhooks } from '../entity/webhook.entity';
 
@@ -58,6 +59,7 @@ export class WebhookService {
     const type = this.normalizeType(input.type);
     const authType = input.authType ?? WebhookAuthType.NO_AUTH;
     this.validateAuthSecret(authType, input.secret);
+    await assertPublicHttpUrl(input.url);
 
     const existingWebhook = await this.webhookRepo.findOne({
       where: {
@@ -321,11 +323,14 @@ export class WebhookService {
     }
 
     try {
+      await assertPublicHttpUrl(webhook.url);
+
       const response = await firstValueFrom(
         this.httpService.post(webhook.url, input.payload, {
           headers: this.getWebhookHeaders(webhook),
           timeout: input.timeoutMs ?? 10000,
           validateStatus: () => true,
+          maxRedirects: 0,
         }),
       );
       const deliveryStatus =
