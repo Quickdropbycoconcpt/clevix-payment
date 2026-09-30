@@ -313,68 +313,74 @@ export class VirtualAccountsService {
     provider: string,
     apiKey: string,
   ): Promise<VirtualAccountCreditResponse> {
-    this.checkProviderHeader(apiKey, provider);
-    const adapter =
-      this.collectionAdapterFactory.getVirtualAccountAdapter(provider);
-    const result = adapter.incomingPaymentWebhook(body);
-    if (!result?.receivedAccountNumber) {
-      this.logger.log('No account found');
-      return;
-    }
-    let dva = await this.dvaRepo.findOne({
-      where: {
-        accountNumber: result.receivedAccountNumber,
-        status: BasicStatus.ACTIVE,
-      },
-    });
-
-    let walletAccount: StaticWalletAccounts;
-
-    if (!dva) {
-      walletAccount = await this.walletAcct.findOne({
-        where: { accountNumber: result.receivedAccountNumber },
-      });
-    }
-
-    if (!walletAccount && !dva) {
-      throw new BadRequestException('Invalid receiving account');
-    }
-
-    if (dva) {
-      await this.dvaRepo.update(
-        {
+    try {
+      await this.checkProviderHeader(apiKey, provider);
+      const adapter =
+        this.collectionAdapterFactory.getVirtualAccountAdapter(provider);
+      const result = adapter.incomingPaymentWebhook(body);
+      if (!result?.receivedAccountNumber) {
+        this.logger.log('No account found');
+        return;
+      }
+      let dva = await this.dvaRepo.findOne({
+        where: {
           accountNumber: result.receivedAccountNumber,
           status: BasicStatus.ACTIVE,
         },
-        { status: BasicStatus.INACTIVE, updatedAt: new Date() },
-      );
+      });
+
+      let walletAccount: StaticWalletAccounts;
+
+      if (!dva) {
+        walletAccount = await this.walletAcct.findOne({
+          where: { accountNumber: result.receivedAccountNumber },
+        });
+      }
+
+      if (!walletAccount && !dva) {
+        throw new BadRequestException('Invalid receiving account');
+      }
+
+      if (dva) {
+        await this.dvaRepo.update(
+          {
+            accountNumber: result.receivedAccountNumber,
+            status: BasicStatus.ACTIVE,
+          },
+          { status: BasicStatus.INACTIVE, updatedAt: new Date() },
+        );
+      }
+      const sourceTransaction = dva
+        ? await this.txnService.getTransactionByMerchantRef(
+            dva.merchantReference,
+          )
+        : null;
+
+      await this.virtualAccountCreditQueue.addCreditJob({
+        dvaId: walletAccount?.walletAccountId ?? dva?.dvaId,
+        businessId: walletAccount?.businessId ?? dva?.businessId,
+        source: sourceTransaction?.source ?? TransactionSource.WALLET_FUNDING,
+        collectionChannel:
+          sourceTransaction?.collectionChannel ??
+          CollectionChannel.VIRTUAL_ACCOUNT,
+        environment: walletAccount?.environment ?? dva?.environment,
+        provider: walletAccount?.provider ?? dva?.provider,
+        merchantReference:
+          dva?.merchantReference ?? result.reference ?? result.sessionId,
+        credit: result,
+        feeCharged: dva?.feeCharged,
+      });
+
+      return {
+        ...result,
+        reference: dva?.merchantReference ?? result.reference,
+      };
+    } catch (error) {
+      this.logger.fatal(error.message);
     }
-    const sourceTransaction = dva
-      ? await this.txnService.getTransactionByMerchantRef(dva.merchantReference)
-      : null;
-
-    await this.virtualAccountCreditQueue.addCreditJob({
-      dvaId: walletAccount?.walletAccountId ?? dva?.dvaId,
-      businessId: walletAccount?.businessId ?? dva?.businessId,
-      source: sourceTransaction?.source ?? TransactionSource.WALLET_FUNDING,
-      collectionChannel:
-        sourceTransaction?.collectionChannel ??
-        CollectionChannel.VIRTUAL_ACCOUNT,
-      environment: walletAccount?.environment ?? dva?.environment,
-      provider: walletAccount?.provider ?? dva?.provider,
-      merchantReference:
-        dva?.merchantReference ?? result.reference ?? result.sessionId,
-      credit: result,
-      feeCharged: dva?.feeCharged,
-    });
-
-    return {
-      ...result,
-      reference: dva?.merchantReference ?? result.reference,
-    };
   }
 
-  private checkProviderHeader(incomingHeader: string, provider: string) {
+  private async checkProviderHeader(incomingHeader: string, provider: string) {
     if (provider != 'vfd') {
       throw new BadRequestException(`Please provide ${provider} signature`);
     }
@@ -384,6 +390,5 @@ export class VirtualAccountsService {
     if (!expectedKey || incomingHeader !== expectedKey) {
       throw new UnauthorizedException('Invalid webhook credentials');
     }
-    this.logger.log('Header passed process');
   }
 }
