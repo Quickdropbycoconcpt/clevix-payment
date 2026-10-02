@@ -70,6 +70,7 @@ export class VirtualAccountsController {
     @Param('provider') provider: string,
     @Headers('x-api-key') apiKey: string,
   ) {
+    this.logger.log('debugging webhook');
     return this.virtualAccountsService.incomingWebhook(dto, provider, apiKey);
   }
 }
