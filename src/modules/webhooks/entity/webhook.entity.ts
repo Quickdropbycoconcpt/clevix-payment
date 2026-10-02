@@ -31,6 +31,9 @@ export class Webhooks extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   secret: string;
 
+  @Column({ type: 'boolean', default: false })
+  isInternalProduct: boolean;
+
   @OneToMany(() => WebhooksSnapshot, (snapshot) => snapshot.webhook)
   snapshots: WebhooksSnapshot[];
 }

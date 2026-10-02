@@ -323,7 +323,9 @@ export class WebhookService {
     }
 
     try {
-      await assertPublicHttpUrl(webhook.url);
+      if (!webhook.isInternalProduct) {
+        await assertPublicHttpUrl(webhook.url);
+      }
 
       const response = await firstValueFrom(
         this.httpService.post(webhook.url, input.payload, {
