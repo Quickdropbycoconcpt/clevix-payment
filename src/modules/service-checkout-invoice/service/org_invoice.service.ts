@@ -572,6 +572,43 @@ export class OrganisationInvoiceService {
     });
   }
 
+  async getInvoiceByTransactionReference(
+    scope: RequestScope,
+    transactionReference: string,
+  ) {
+    const { businessId, environment } = getBusinessScope(scope);
+
+    const attempt = await this.invoiceTransactionRepo.findOne({
+      where: {
+        invoiceTransactionReference: transactionReference.trim(),
+        businessId,
+        environment,
+      },
+      relations: { invoice: true },
+    });
+
+    if (!attempt?.invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    const items = await this.invoiceItemRepo.find({
+      where: { invoiceId: attempt.invoice.invoiceId },
+      relations: { item: true },
+    });
+
+    return {
+      ...attempt.invoice,
+      items: items.map((item) => ({
+        itemId: item.itemId,
+        name: item.item?.name,
+        amount: item.amount,
+        baseAmount: item.baseAmount,
+        taxAmount: item.taxAmount,
+        taxId: item.taxId,
+      })),
+    };
+  }
+
   async listInvoiceTransactions(scope: RequestScope, reference: string) {
     const { businessId, environment, pagination } = getBusinessScope(scope);
 

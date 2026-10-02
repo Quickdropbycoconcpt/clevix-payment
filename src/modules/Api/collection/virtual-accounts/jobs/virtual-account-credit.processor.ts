@@ -37,6 +37,8 @@ export class VirtualAccountCreditProcessor extends WorkerHost {
         merchantReference,
         feeCharged,
         collectionChannel,
+        customerName,
+        customerEmail,
       } = job.data;
       await this.settlementService.createSettlement({
         businessId,
@@ -53,6 +55,8 @@ export class VirtualAccountCreditProcessor extends WorkerHost {
         merchantReference,
         providerReference: credit.reference,
         feeCharged,
+        customerName,
+        customerEmail,
         metadata: {
           senderAccountNumber: credit.senderAccountNumber,
           senderName: credit.senderName,

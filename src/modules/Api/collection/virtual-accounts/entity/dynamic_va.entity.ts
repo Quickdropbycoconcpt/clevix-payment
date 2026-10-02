@@ -28,6 +28,12 @@ export class DynamicVirtualAccounts extends BaseEntity {
   @Column({ type: 'varchar' })
   reference: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  accountName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  customerEmail: string | null;
+
   @Column({ type: 'int', default: 2400 })
   validityTime: number;
 

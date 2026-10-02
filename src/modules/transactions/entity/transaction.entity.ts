@@ -67,6 +67,12 @@ export class Transactions extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   providerReference: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  customerName: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  customerEmail: string | null;
+
   @Column({ type: 'enum', nullable: true, enum: TransactionSettlementStatus })
   settlementStatus: TransactionSettlementStatus;
 

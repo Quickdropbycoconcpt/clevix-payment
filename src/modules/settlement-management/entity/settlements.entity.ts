@@ -10,6 +10,9 @@ export class Settlements extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   settlementId: string;
 
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  reference: string | null;
+
   @Column({ type: 'enum', enum: IncomingPaymentSource })
   paymentSource: IncomingPaymentSource;
 

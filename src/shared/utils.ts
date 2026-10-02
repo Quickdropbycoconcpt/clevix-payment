@@ -159,6 +159,16 @@ export function generateRrn(): string {
   return `${timestamp}${random}`; // 12 digits total
 }
 
+export function generateReadableReference(prefix: string): string {
+  const digits = () => randomInt(0, 10000).toString().padStart(4, '0');
+  const letters = () =>
+    Array.from({ length: 4 }, () =>
+      String.fromCodePoint(65 + randomInt(0, 26)),
+    ).join('');
+
+  return `${prefix}-${digits()}-${letters()}-${digits()}`;
+}
+
 export type SettlementSharingAllocation = {
   settlementBankAccountId: string | null;
   walletId?: string | null;

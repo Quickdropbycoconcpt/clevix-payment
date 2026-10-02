@@ -602,6 +602,8 @@ export class SettlementService {
         executionStatus: TransactionStatus.SUCCESS,
         merchantReference: input.merchantReference ?? input.reference,
         providerReference: input.providerReference ?? input.reference,
+        customerName: input.customerName ?? null,
+        customerEmail: input.customerEmail ?? null,
         settlementStatus: this.getTransactionSettlementStatus(
           shouldCreditWalletNow,
         ),

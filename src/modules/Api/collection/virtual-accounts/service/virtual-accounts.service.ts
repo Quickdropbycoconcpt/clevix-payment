@@ -105,6 +105,8 @@ export class VirtualAccountsService {
         validityTime,
         environment: scope.environment,
         feeCharged: null,
+        accountName: dto.accountName.trim(),
+        customerEmail: dto.customerEmail?.trim().toLowerCase() ?? null,
       });
       await entityManager.save(dva);
       await this.txnService.createTransaction(
@@ -123,6 +125,8 @@ export class VirtualAccountsService {
           sourceId: dva.dvaId,
           merchantReference: dto.reference,
           providerReference: ourRef,
+          customerName: dto.accountName.trim(),
+          customerEmail: dto.customerEmail?.trim().toLowerCase() ?? null,
           idempotencyKey: `virtual-account:${scope.businessId}:${dto.reference}`,
           remark: 'Virtual account collection initiated',
           metadata: {
@@ -383,6 +387,8 @@ export class VirtualAccountsService {
           dva?.merchantReference ?? result.reference ?? result.sessionId,
         credit: result,
         feeCharged: dva?.feeCharged,
+        customerName: dva?.accountName ?? walletAccount?.accountName ?? null,
+        customerEmail: dva?.customerEmail ?? null,
       });
 
       return {

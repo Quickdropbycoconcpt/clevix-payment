@@ -20,6 +20,8 @@ export type CreditWallet = {
   sourceId?: string | null;
   merchantReference?: string | null;
   providerReference?: string | null;
+  customerName?: string | null;
+  customerEmail?: string | null;
   metadata?: Record<string, unknown>;
   /**
    * Set when the fee was already computed and collected upstream (e.g. added

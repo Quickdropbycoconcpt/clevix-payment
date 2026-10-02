@@ -20,6 +20,9 @@ export class SettlementTransactions extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   settlementTransactionsId: string;
 
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  reference: string | null;
+
   @Column({ type: 'uuid', nullable: true })
   settlementId: string | null;
 

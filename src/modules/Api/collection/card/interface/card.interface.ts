@@ -7,6 +7,10 @@ export class CardInput {
 
   email: string;
 
+  firstName?: string;
+
+  lastName?: string;
+
   cardNumber: string;
 
   cvv2: string;

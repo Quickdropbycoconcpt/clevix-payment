@@ -33,4 +33,32 @@ export class SettlementTransactionsController {
       settlementId,
     );
   }
+
+  @Get(':settlementId/transactions/:settlementTransactionsId/items')
+  async listSettlementTransactionItems(
+    @CurrentUser() user: JwtPayload,
+    @Param('settlementId', ParseUUIDPipe) settlementId: string,
+    @Param('settlementTransactionsId', ParseUUIDPipe)
+    settlementTransactionsId: string,
+  ) {
+    return this.settlementTransactionsService.listSettlementTransactionItems(
+      user,
+      settlementId,
+      settlementTransactionsId,
+    );
+  }
+
+  @Get(':settlementId/transactions/:settlementTransactionsId/analytics')
+  async getSettlementTransactionAnalytics(
+    @CurrentUser() user: JwtPayload,
+    @Param('settlementId', ParseUUIDPipe) settlementId: string,
+    @Param('settlementTransactionsId', ParseUUIDPipe)
+    settlementTransactionsId: string,
+  ) {
+    return this.settlementTransactionsService.getSettlementTransactionAnalytics(
+      user,
+      settlementId,
+      settlementTransactionsId,
+    );
+  }
 }

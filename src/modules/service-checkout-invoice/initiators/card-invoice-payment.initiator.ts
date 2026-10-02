@@ -41,6 +41,7 @@ export class CardInvoicePaymentInitiator implements InvoicePaymentInitiator {
         amount: feePreview.totalAmount,
         reference: attempt.invoiceTransactionReference,
         email: cardIntent.email,
+        firstName: invoice.payerFullName,
         cardNumber: cardIntent.cardNumber,
         cardPin: cardIntent.cardPin,
         cvv2: cardIntent.cvv2,

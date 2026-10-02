@@ -79,6 +79,11 @@ export class CardPaymentService {
             sourceId: txn.cardTransactionId,
             merchantReference: input.reference,
             providerReference: ourRef,
+            customerName:
+              [input.firstName, input.lastName]
+                .filter((name) => name?.trim())
+                .join(' ') || null,
+            customerEmail: input.email ?? null,
             idempotencyKey: `debit-card:${scope.businessId}:${input.reference}`,
             remark: 'Debit card collection initiated',
             metadata: {},

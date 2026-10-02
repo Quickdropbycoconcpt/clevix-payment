@@ -36,6 +36,8 @@ export type CreateTransactionInput = {
   executionStatus?: TransactionStatus;
   merchantReference?: string | null;
   providerReference?: string | null;
+  customerName?: string | null;
+  customerEmail?: string | null;
   settlementStatus?: TransactionSettlementStatus | null;
   riskStatus?: TransactionRiskStatus | null;
   direction: LedgerEntryDirection;
@@ -146,6 +148,8 @@ export class TransactionService {
       executionStatus: input.executionStatus ?? TransactionStatus.INITIATED,
       merchantReference: input.merchantReference ?? null,
       providerReference: input.providerReference ?? null,
+      customerName: input.customerName ?? null,
+      customerEmail: input.customerEmail ?? null,
       settlementStatus:
         input.settlementStatus ?? TransactionSettlementStatus.UNSETTLED,
       riskStatus: input.riskStatus ?? TransactionRiskStatus.CLEAR,

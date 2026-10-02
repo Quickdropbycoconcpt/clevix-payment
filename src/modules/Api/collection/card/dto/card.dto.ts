@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
 import { IsBigIntAmountString } from 'src/shared/validators/is-bigint-amount-string.validator';
 
 export class CardDto {
@@ -62,6 +62,18 @@ export class CardPaymentDto {
   @ApiProperty({ example: 'Payment for electronics' })
   @IsString()
   narration: string;
+
+  @ApiPropertyOptional({ example: 'Ada' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  firstName?: string;
+
+  @ApiPropertyOptional({ example: 'Lovelace' })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  lastName?: string;
 }
 
 export class ValidateCardOtpDto {
