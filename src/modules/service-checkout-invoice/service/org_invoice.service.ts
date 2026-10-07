@@ -578,26 +578,25 @@ export class OrganisationInvoiceService {
   ) {
     const { businessId, environment } = getBusinessScope(scope);
 
-    const attempt = await this.invoiceTransactionRepo.findOne({
+    const invoice = await this.invoiceRepo.findOne({
       where: {
-        invoiceTransactionReference: transactionReference.trim(),
+        reference: transactionReference.trim(),
         businessId,
         environment,
       },
-      relations: { invoice: true },
     });
 
-    if (!attempt?.invoice) {
+    if (!invoice) {
       throw new NotFoundException('Invoice not found');
     }
 
     const items = await this.invoiceItemRepo.find({
-      where: { invoiceId: attempt.invoice.invoiceId },
+      where: { invoiceId: invoice.invoiceId },
       relations: { item: true },
     });
 
     return {
-      ...attempt.invoice,
+      invoice,
       items: items.map((item) => ({
         itemId: item.itemId,
         name: item.item?.name,
