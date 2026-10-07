@@ -1,18 +1,47 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Transactions } from '../entity/transaction.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { getBusinessScope, RequestScope } from 'src/shared/business-scope';
 import { createOffsetPaginatedResponse } from 'src/shared/http/pagination';
 import { parseDateRange } from 'src/shared/http/date-range';
 import { ListTransactionsQueryDto } from '../dto/list-transactions-query.dto';
+import { InvoicePaymentTransaction } from '../../service-checkout-invoice/entity/invoice_transaction.entity';
+import { TransactionSource } from 'src/shared/enum';
 
 @Injectable()
 export class TransactionsServiceListing {
   constructor(
     @InjectRepository(Transactions)
     private readonly transactionRepo: Repository<Transactions>,
+    @InjectRepository(InvoicePaymentTransaction)
+    private readonly invoiceTransactionRepo: Repository<InvoicePaymentTransaction>,
   ) {}
+
+  private async getInvoicesByTransactionReference(
+    businessId: string,
+    environment: string,
+    references: string[],
+  ) {
+    if (references.length === 0) {
+      return new Map<string, InvoicePaymentTransaction['invoice']>();
+    }
+
+    const attempts = await this.invoiceTransactionRepo.find({
+      where: {
+        invoiceTransactionReference: In(references),
+        businessId,
+        environment,
+      },
+      relations: { invoice: true },
+    });
+
+    return new Map(
+      attempts
+        .filter((attempt) => attempt.invoice)
+        .map((attempt) => [attempt.invoiceTransactionReference, attempt.invoice]),
+    );
+  }
 
   async listTransactions(
     scope: RequestScope,
@@ -75,7 +104,24 @@ export class TransactionsServiceListing {
 
     const [transactions, total] = await qb.getManyAndCount();
 
-    return createOffsetPaginatedResponse(transactions, pagination, { total });
+    const invoiceTransactionReferences = transactions
+      .filter((txn) => txn.source === TransactionSource.CHECKOUT_INVOICE)
+      .map((txn) => txn.reference);
+
+    const invoicesByReference = await this.getInvoicesByTransactionReference(
+      businessId,
+      environment,
+      invoiceTransactionReferences,
+    );
+
+    const transactionsWithInvoice = transactions.map((txn) => ({
+      ...txn,
+      invoice: invoicesByReference.get(txn.reference) ?? null,
+    }));
+
+    return createOffsetPaginatedResponse(transactionsWithInvoice, pagination, {
+      total,
+    });
   }
 
   async getTransactionDetails(scope: RequestScope, transactionId: string) {
@@ -118,6 +164,16 @@ export class TransactionsServiceListing {
       throw new NotFoundException('Transaction not found');
     }
 
-    return transaction;
+    let invoice: InvoicePaymentTransaction['invoice'] | null = null;
+    if (transaction.source === TransactionSource.CHECKOUT_INVOICE) {
+      const invoicesByReference = await this.getInvoicesByTransactionReference(
+        businessId,
+        environment,
+        [transaction.reference],
+      );
+      invoice = invoicesByReference.get(transaction.reference) ?? null;
+    }
+
+    return { ...transaction, invoice };
   }
 }
