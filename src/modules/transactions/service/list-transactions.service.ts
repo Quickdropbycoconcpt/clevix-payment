@@ -39,7 +39,10 @@ export class TransactionsServiceListing {
     return new Map(
       attempts
         .filter((attempt) => attempt.invoice)
-        .map((attempt) => [attempt.invoiceTransactionReference, attempt.invoice]),
+        .map((attempt) => [
+          attempt.invoiceTransactionReference,
+          attempt.invoice,
+        ]),
     );
   }
 
@@ -116,7 +119,7 @@ export class TransactionsServiceListing {
 
     const transactionsWithInvoice = transactions.map((txn) => ({
       ...txn,
-      invoice: invoicesByReference.get(txn.reference) ?? null,
+      invoice: invoicesByReference.get(txn.merchantReference) ?? null,
     }));
 
     return createOffsetPaginatedResponse(transactionsWithInvoice, pagination, {
