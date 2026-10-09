@@ -109,7 +109,7 @@ export class TransactionsServiceListing {
 
     const invoiceTransactionReferences = transactions
       .filter((txn) => txn.source === TransactionSource.CHECKOUT_INVOICE)
-      .map((txn) => txn.reference);
+      .map((txn) => txn.merchantReference);
 
     const invoicesByReference = await this.getInvoicesByTransactionReference(
       businessId,
