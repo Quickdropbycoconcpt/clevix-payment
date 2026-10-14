@@ -25,7 +25,12 @@ export class PaginationInterceptor implements NestInterceptor {
       request.user.pagination = request.pagination;
     }
 
-    removePaginationQuery(request.query);
+    Object.defineProperty(request, 'query', {
+      value: removePaginationQuery(request.query),
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
 
     return next.handle();
   }

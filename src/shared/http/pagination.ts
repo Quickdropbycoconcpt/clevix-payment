@@ -161,10 +161,16 @@ export function createPaginatedResponse<T>(
   return createOffsetPaginatedResponse(data, pagination, options);
 }
 
-export function removePaginationQuery(query: Request['query']) {
+export function removePaginationQuery(
+  query: Request['query'],
+): Request['query'] {
+  const filtered = { ...query };
+
   for (const key of PAGINATION_QUERY_KEYS) {
-    delete query[key];
+    delete filtered[key];
   }
+
+  return filtered;
 }
 
 function clampLimit(limit?: number) {
