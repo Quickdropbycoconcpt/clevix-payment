@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { KycAdapterFactory } from 'src/infrastructure/kyc/adapters/kyc.adapter.factory';
 import { DojahKycProvider } from 'src/infrastructure/kyc/providers/dojah/dojah-kyc.adapter';
+import { DojahApiClient } from 'src/infrastructure/kyc/providers/dojah/dojah-api-client';
 import { FcmbKycProvider } from 'src/infrastructure/kyc/providers/fcmb/fcmb-kyc.adapter';
 import { VfdKycProvider } from 'src/infrastructure/kyc/providers/vfd/vfd-kyc.adapter';
 import { KycController } from './controller/kyc.controllers';
@@ -14,6 +15,7 @@ import { VfdClient } from 'src/infrastructure/payments/providers/vfd/vfd.client'
     VfdKycProvider,
     VfdClient,
     DojahKycProvider,
+    DojahApiClient,
     FcmbKycProvider,
     KycService,
   ],
