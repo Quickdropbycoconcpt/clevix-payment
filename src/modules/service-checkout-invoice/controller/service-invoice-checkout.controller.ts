@@ -58,14 +58,10 @@ export class ServiceInvoiceCheckoutController {
     return this.service.listInvoiceTransactions(user, reference);
   }
 
+  @Public()
   @Get('details/:reference')
-  @BusinessDashboardAuth()
-  @ApiBearerAuth('bearer')
-  async getInvoiceByTransactionReference(
-    @Param('reference') reference: string,
-    @CurrentUser() user: RequestScope,
-  ) {
-    return this.service.getInvoiceByTransactionReference(user, reference);
+  async getInvoiceByTransactionReference(@Param('reference') reference: string) {
+    return this.service.getInvoiceByTransactionReference(reference);
   }
 
   @Public()

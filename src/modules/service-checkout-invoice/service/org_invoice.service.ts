@@ -572,18 +572,9 @@ export class OrganisationInvoiceService {
     });
   }
 
-  async getInvoiceByTransactionReference(
-    scope: RequestScope,
-    transactionReference: string,
-  ) {
-    const { businessId, environment } = getBusinessScope(scope);
-
+  async getInvoiceByTransactionReference(transactionReference: string) {
     const invoice = await this.invoiceRepo.findOne({
-      where: {
-        reference: transactionReference.trim(),
-        businessId,
-        environment,
-      },
+      where: { reference: transactionReference.trim() },
     });
 
     if (!invoice) {

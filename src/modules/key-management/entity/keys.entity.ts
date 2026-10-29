@@ -18,6 +18,9 @@ export class Key extends BaseEntity {
   @Column({ type: 'varchar' })
   clientId: string;
 
+  // @Column({ type: 'timestamptz', nullable: true })
+  // revokedAt: Date;
+
   @Column({ type: 'varchar' })
   keyHash: string;
 
