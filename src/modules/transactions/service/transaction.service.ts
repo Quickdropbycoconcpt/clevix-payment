@@ -92,9 +92,6 @@ export class TransactionService {
   constructor(
     @InjectRepository(Transactions)
     private readonly transactionRepo: Repository<Transactions>,
-
-    @InjectRepository(WalletTransactions)
-    private readonly walletTransactionsRepo: Repository<WalletTransactions>,
   ) {}
 
   async createTransaction(
