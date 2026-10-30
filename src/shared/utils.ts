@@ -13,9 +13,9 @@ export type DecimalRatio = {
   numerator: bigint;
   denominator: bigint;
 };
-const proxyUrl = process.env.QUOTAGUARDSTATIC_URL ?? 'https://example.com';
+// const proxyUrl = process.env.QUOTAGUARDSTATIC_URL ?? 'https://example.com';
 
-const httpsAgent = new HttpsProxyAgent(proxyUrl);
+// const httpsAgent = new HttpsProxyAgent(proxyUrl);
 export const toIntegerAmountString = (
   amount: IntegerAmount,
   fieldName: string,
@@ -136,7 +136,7 @@ export function axiosConfig(
   };
 
   if (merchantEnvironment === RequestEnvironment.LIVE) {
-    axiosConfig.httpsAgent = httpsAgent;
+    // axiosConfig.httpsAgent = httpsAgent;
 
     return axiosConfig;
   }
