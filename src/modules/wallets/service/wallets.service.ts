@@ -636,11 +636,11 @@ export class WalletService {
   ) {
     const walletRepo = entityManager?.getRepository(Wallets) ?? this.walletRepo;
     const scope = businessScopeFilter(jwtResult);
-
+    const { pagination, ...rest } = scope;
     const wallet = await walletRepo.findOne({
       where: {
         currency: input.currency,
-        ...scope,
+        ...rest,
       },
       ...(options.lock ? { lock: { mode: 'pessimistic_write' as const } } : {}),
     });
