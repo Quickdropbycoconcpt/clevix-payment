@@ -33,5 +33,6 @@ export class WithdrawalDto {
 
   @IsString()
   @IsNotEmpty()
+  @IsOptional()
   accountName: string;
 }

@@ -691,7 +691,7 @@ export class VfdClient {
       fromSavingsId: accountId,
       fromBvn: '',
       toClientId: recieverDetails.data.clientId,
-      toClient: body.accountName,
+      toClient: recieverDetails.data.name,
       toSavingsId: recieverDetails.data.account.id,
       toSession: recieverDetails.data.account.id,
       toBvn: recieverDetails.data.bvn,
