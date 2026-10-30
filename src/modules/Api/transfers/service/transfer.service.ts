@@ -87,7 +87,7 @@ export class TransferService {
       throw new NotFoundException('Transactions not found');
     }
 
-    return { status: transfer.status, code: '00' };
+    return { status: transfer.status, code: '00', success: true };
   }
 
   @Cron('*/3 * * * *')
