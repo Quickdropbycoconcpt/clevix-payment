@@ -78,7 +78,7 @@ export class VfdClient {
         raw: response.data,
       };
     } catch (error: any) {
-      console.log(error);
+      this.logger.error(error);
       throw new BadRequestException(
         error?.response?.data?.message ?? error.message,
         error,
@@ -117,7 +117,7 @@ export class VfdClient {
         raw: response.data,
       };
     } catch (error: any) {
-      console.log(error);
+      this.logger.error(error);
       throw new BadRequestException(
         error?.response?.data?.message ?? error.message,
         error,
@@ -129,7 +129,6 @@ export class VfdClient {
     input: CreateVirtualAccountInput,
   ): Promise<VfdCreateVirtualAccountResponse> {
     const response = await this.vfdVirtualAccountGeneration(input);
-    console.log(response);
     return {
       accountNumber: response.data?.accountNumber,
       accountName: input.accountName,
@@ -182,7 +181,7 @@ export class VfdClient {
       );
       return response;
     } catch (error: any) {
-      console.log(error);
+      this.logger.error(error);
       throw new BadRequestException('Invalid request.', error);
     }
   }
@@ -247,7 +246,7 @@ export class VfdClient {
         latitude: null,
         longitude: null,
       };
-      console.log(payload);
+
       const encrypted = tripleDESEncrypt(JSON.stringify(payload), sessionId);
       const cardCharge = await firstValueFrom(
         this.httpService.post(
@@ -413,7 +412,7 @@ export class VfdClient {
       const responseData = response.data;
       const cardData = responseData?.data ?? {};
       const code = cardData?.code;
-      console.log(response);
+
       return {
         success: responseData?.success ?? false,
         code,
@@ -422,9 +421,8 @@ export class VfdClient {
         redirectUrl: code !== '01' ? cardData?.redirectHtml : undefined,
         requiredOtp: code == '01',
       };
-    } catch (error) {
-      console.log(error);
-      console.log(error?.response?.data);
+    } catch (error: any) {
+      this.logger.error(error?.response?.data ?? error);
       throw new BadRequestException('Unable to initiate payment');
     }
   }
@@ -495,8 +493,8 @@ export class VfdClient {
         code: cardData?.code,
         message: responseData?.message ?? cardData?.narration,
       };
-    } catch (error) {
-      console.log(error?.response);
+    } catch (error: any) {
+      this.logger.error(error?.response);
       throw new BadRequestException(
         error?.response?.data?.message ?? 'Unable to validate payment OTP',
       );
@@ -534,7 +532,7 @@ export class VfdClient {
         accountNumber: response.data.data.accountNo,
       };
     } catch (error: any) {
-      console.log(error);
+      this.logger.error(error);
       throw new BadRequestException(error.response.data.message, error);
     }
   }
@@ -573,7 +571,7 @@ export class VfdClient {
           ),
         ),
       );
-      console.log(response);
+
       if (response.data.status != '00') {
         throw new BadRequestException(response.data.message);
       }
@@ -582,7 +580,7 @@ export class VfdClient {
         accountNumber: response.data.data.accountNo,
       };
     } catch (error: any) {
-      console.log(error.response.data.message);
+      this.logger.error(error.response.data.message);
       throw new BadRequestException(error.response.data.message, error);
     }
   }
@@ -644,7 +642,7 @@ export class VfdClient {
         return response?.data?.data?.access_token as string;
       }
     } catch (error: any) {
-      console.log(error.response.data);
+      this.logger.error(error.response.data);
       throw new BadRequestException(error.message);
     }
   }
@@ -716,7 +714,7 @@ export class VfdClient {
       );
       return response.data;
     } catch (error: any) {
-      console.log(error);
+      this.logger.error(error);
       throw new BadRequestException(error.message);
     }
   }
@@ -745,7 +743,7 @@ export class VfdClient {
       const { accountNo, client, clientId, accountId } = response.data.data;
       return { clientId, client, accountNo, accountId };
     } catch (error) {
-      console.log(error);
+      this.logger.error(error);
     }
   }
 
@@ -791,7 +789,6 @@ export class VfdClient {
           ),
         ),
       );
-      console.log('txnStatus', response);
       if (!response?.data?.data?.transactionStatus) {
         return {
           success: false,
@@ -807,7 +804,7 @@ export class VfdClient {
             reference,
           };
     } catch (error) {
-      console.log(error);
+      this.logger.error(error);
       return { success: false, sessionId: null, reference: input.reference };
     }
   }
@@ -844,7 +841,7 @@ export class VfdClient {
         raw: response.data,
       };
     } catch (error: any) {
-      console.log(error);
+      this.logger.error(error);
       throw new BadRequestException(
         error?.response?.data?.message ?? error.message,
         error,
