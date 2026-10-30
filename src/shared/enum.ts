@@ -99,7 +99,7 @@ export enum WalletTransactionSource {
 }
 
 export enum JobQueueList {
-  MONEY_TRANSFER_PROCESSOR = 'MONEY_TRANSFER_PROCESSOR',
+  MONEY_TRANSFER_PROCESSOR = 'CLEVIX_PAYMENT_MONEY_TRANSFER_PROCESSOR',
 }
 
 export enum WebhookAuthType {
