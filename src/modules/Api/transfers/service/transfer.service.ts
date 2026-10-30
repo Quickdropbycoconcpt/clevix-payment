@@ -119,6 +119,14 @@ export class TransferService {
           });
 
           if (!result.success) {
+            await this.walletTransactionRepo.update(
+              { walletTransactionId: transfer.walletTransactionId },
+              {
+                status: WalletTransactionStatus.FAILED,
+                providerReference:
+                  result.sessionId ?? transfer.providerReference,
+              },
+            );
             return;
           }
 
