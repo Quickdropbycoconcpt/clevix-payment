@@ -117,7 +117,7 @@ export class TransferService {
             environment: transfer.environment,
             reference: transfer.reference,
           });
-
+          console.log(result);
           if (!result.success) {
             await this.walletTransactionRepo.update(
               { walletTransactionId: transfer.walletTransactionId },
