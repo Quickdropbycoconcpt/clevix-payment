@@ -34,6 +34,7 @@ export class TransferJobProccessor extends WorkerHost {
 
       return result;
     } catch (error) {
+      console.log(error);
       if (jobData.walletTransactionId) {
         await this.walletTransactionRepo.update(
           { walletTransactionId: jobData.walletTransactionId },
