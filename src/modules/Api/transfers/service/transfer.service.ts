@@ -82,7 +82,7 @@ export class TransferService {
         source: WalletTransactionSource.PAYOUT,
       },
     });
-
+    console.log(transfer);
     if (!transfer) {
       throw new NotFoundException('Transactions not found');
     }
