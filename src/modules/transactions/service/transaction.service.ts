@@ -16,6 +16,7 @@ import {
 import { IntegerAmount, toIntegerAmountString } from 'src/shared/utils';
 import { Brackets, EntityManager, Repository } from 'typeorm';
 import { Transactions } from '../entity/transaction.entity';
+import { WalletTransactions } from 'src/modules/wallets/entity/wallet_transactions.entity';
 
 type TransactionAmount = IntegerAmount;
 
@@ -91,6 +92,9 @@ export class TransactionService {
   constructor(
     @InjectRepository(Transactions)
     private readonly transactionRepo: Repository<Transactions>,
+
+    @InjectRepository(WalletTransactions)
+    private readonly walletTransactionsRepo: Repository<WalletTransactions>,
   ) {}
 
   async createTransaction(
