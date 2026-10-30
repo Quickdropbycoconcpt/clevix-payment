@@ -87,7 +87,10 @@ export class BanksService {
   async validateBankAccount(body: ValidateAccountDto) {
     const adapter = this.banksAdapterFactory.getBankAdapter(BankProvider.VFD);
     try {
-      await adapter.validateAccountNumber(body.accountNumber, body.bankCode);
+      return await adapter.validateAccountNumber(
+        body.accountNumber,
+        body.bankCode,
+      );
     } catch (error) {
       this.logger.error(error);
       throw new BadRequestException(
