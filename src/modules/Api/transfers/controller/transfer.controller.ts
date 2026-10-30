@@ -26,6 +26,7 @@ export class TransferController {
     @Param('reference') reference: string,
     @CurrentUser() user: JwtPayload,
   ) {
+    console.log(`you called ${reference}`);
     return await this.transferService.getTransferStatus(reference, user);
   }
 }
