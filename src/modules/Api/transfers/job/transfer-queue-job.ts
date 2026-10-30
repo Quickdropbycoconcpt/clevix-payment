@@ -1,5 +1,5 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
 import { JobQueueList } from 'src/shared/enum';
 export type TransferQueJobData = {
@@ -19,6 +19,8 @@ export type TransferQueJobData = {
 
 @Injectable()
 export class AddTransferIntoQue {
+  private readonly logger = new Logger(AddTransferIntoQue.name);
+
   constructor(
     @InjectQueue(JobQueueList.MONEY_TRANSFER_PROCESSOR)
     private readonly transferQueue: Queue<TransferQueJobData>,
@@ -43,5 +45,9 @@ export class AddTransferIntoQue {
 
       jobId: input.reference,
     });
+
+    this.logger.log(
+      `Queued transfer payout reference=${input.reference} provider=${input.provider}`,
+    );
   }
 }
