@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { TransferService } from '../service/transfer.service';
 import { WithdrawalDto } from '../dto/transfer.dto';
@@ -21,7 +21,7 @@ export class TransferController {
     return await this.transferService.processPayout(body, user);
   }
 
-  @Post('status/:reference')
+  @Get('status/:reference')
   async status(
     @Param('reference') reference: string,
     @CurrentUser() user: JwtPayload,

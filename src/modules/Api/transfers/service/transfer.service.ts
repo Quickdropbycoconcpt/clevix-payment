@@ -82,12 +82,17 @@ export class TransferService {
         source: WalletTransactionSource.PAYOUT,
       },
     });
-    console.log(transfer);
+
     if (!transfer) {
       throw new NotFoundException('Transactions not found');
     }
 
-    return { status: transfer.status, code: '00', success: true };
+    return {
+      status: transfer.status,
+      code: transfer.status === WalletTransactionStatus.COMPLETED ? '00' : '01',
+      success: transfer.status === WalletTransactionStatus.COMPLETED,
+      sessionId: transfer.providerReference,
+    };
   }
 
   @Cron('*/3 * * * *')
