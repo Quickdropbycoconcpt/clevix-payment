@@ -413,13 +413,17 @@ export class VfdClient {
       const cardData = responseData?.data ?? {};
       const code = cardData?.code;
 
+      this.logger.log(
+        `VFD card initiation response reference=${body.reference} code=${code} cardData=${JSON.stringify(cardData)}`,
+      );
+
       return {
         success: responseData?.success ?? false,
         code,
         reference: body.reference,
         message: responseData?.message ?? cardData?.narration,
         redirectUrl: code !== '01' ? cardData?.redirectHtml : undefined,
-        requiredOtp: code == '01',
+        requiredOtp: cardData?.redirectHtml != undefined,
       };
     } catch (error: any) {
       this.logger.error(error?.response?.data ?? error);

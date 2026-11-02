@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from 'src/modules/authentication/decorators/current-user.decorator';
 import { ApiJwtAuthGuard } from 'src/modules/authentication/guards/api-guard';
 import type { JwtPayload } from 'src/modules/authentication/interface/jwt-payload.interface';
+import { Public } from 'src/modules/authentication/decorators/public.decorator';
 import { TransactionService } from '../service/transaction.service';
 import { TransactionsServiceListing } from '../service/list-transactions.service';
 
@@ -26,5 +27,11 @@ export class TransactionsController {
       businessId: user.businessId,
       environment: user.environment,
     });
+  }
+
+  @Public()
+  @Get('public/status/:reference')
+  async getPublicTransactionStatus(@Param('reference') reference: string) {
+    return this.transactionService.getPublicTransactionStatus(reference);
   }
 }

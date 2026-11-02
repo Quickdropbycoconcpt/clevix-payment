@@ -326,6 +326,26 @@ export class TransactionService {
     return this.toTransactionStatusResponse(transaction);
   }
 
+  async getPublicTransactionStatus(
+    reference: string,
+  ): Promise<TransactionStatusResponse> {
+    const trimmedReference = reference?.trim();
+
+    if (!trimmedReference) {
+      throw new BadRequestException('Transaction reference is required');
+    }
+
+    const transaction = await this.transactionRepo.findOne({
+      where: { reference: trimmedReference },
+    });
+
+    if (!transaction) {
+      throw new NotFoundException('Transaction not found');
+    }
+
+    return this.toTransactionStatusResponse(transaction);
+  }
+
   private getTransactionUpdatePayload(
     input: UpdateTransactionInput,
   ): Partial<Transactions> {
