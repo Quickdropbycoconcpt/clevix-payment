@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   DecimalValue,
@@ -21,6 +21,8 @@ type FeeCalculationInput = {
 
 @Injectable()
 export class FeeConfigurationService {
+  private readonly logger = new Logger(FeeConfigurationService.name);
+
   constructor(
     @InjectRepository(PlatformFeeConfiguration)
     private readonly platformFeeRepo: Repository<PlatformFeeConfiguration>,
@@ -35,10 +37,14 @@ export class FeeConfigurationService {
     amount: FeeAmount,
     precomputedFee?: { feature: string; feeCollected: FeeAmount },
   ): Promise<{ providerFee: bigint; chargedFee: bigint; provider: string }> {
-    const normalizedProvider = provider.trim();
+    const normalizedProvider = provider.trim().toLowerCase();
     const normalizedFeeSource = feeSource.trim();
     const normalizedBusinessId = businessId.trim();
     const amountInKobo = toIntegerAmountBigInt(amount, 'amount');
+
+    this.logger.log(
+      `Looking up fee config provider=${normalizedProvider} feeSource=${normalizedFeeSource} businessId=${normalizedBusinessId}`,
+    );
 
     if (!normalizedProvider || !normalizedFeeSource || !normalizedBusinessId) {
       throw new BadRequestException(
