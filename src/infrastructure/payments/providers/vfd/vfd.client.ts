@@ -422,8 +422,9 @@ export class VfdClient {
         code,
         reference: body.reference,
         message: responseData?.message ?? cardData?.narration,
-        redirectUrl: code !== '01' ? cardData?.redirectHtml : undefined,
-        requiredOtp: cardData?.redirectHtml != undefined,
+        redirectUrl:
+          cardData?.authType !== 'OTP' ? cardData?.redirectHtml : undefined,
+        requiredOtp: cardData?.authType === 'OTP',
       };
     } catch (error: any) {
       this.logger.error(error?.response?.data ?? error);
