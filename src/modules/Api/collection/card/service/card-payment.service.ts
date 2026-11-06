@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Repository } from 'typeorm';
 import {
   CardAuthType,
@@ -133,6 +137,23 @@ export class CardPaymentService {
       environment: scope.environment,
       otp: input.otp?.trim(),
       reference: `${input.reference?.trim()}`,
+    });
+  }
+
+  async validateOtpByReference(input: ValidateCardOtpDto) {
+    const reference = input.reference?.trim();
+
+    const cardTransaction = await this.cardTransactionRepo.findOne({
+      where: { reference },
+    });
+
+    if (!cardTransaction) {
+      throw new NotFoundException('Card transaction not found');
+    }
+
+    return this.validateCardOtp(input, {
+      businessId: cardTransaction.businessId,
+      environment: cardTransaction.environment,
     });
   }
 

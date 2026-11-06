@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Public } from 'src/modules/authentication/decorators/public.decorator';
 import { InvoiceCreationDto } from '../dto/org_invoice.dto';
 import { PayInvoiceDto } from '../dto/pay-invoice.dto';
+import { ValidateCardOtpDto } from 'src/modules/Api/collection/card/dto/card.dto';
 import { OrganisationInvoiceService } from '../service/org_invoice.service';
 import { SupportedPaymentMethod } from '../entity/invoice_transaction.entity';
 import { InvoiceStatus } from '../entity/service_checkout_invoice.entity';
@@ -68,5 +69,11 @@ export class ServiceInvoiceCheckoutController {
   @Post('pay')
   async payInvoice(@Body() dto: PayInvoiceDto) {
     return this.service.payInvoice(dto);
+  }
+
+  @Public()
+  @Post('validate-otp')
+  async validateCardOtp(@Body() dto: ValidateCardOtpDto) {
+    return this.service.validateCardOtp(dto);
   }
 }

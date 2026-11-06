@@ -37,6 +37,8 @@ import {
   TransactionStatus,
 } from 'src/shared/enum';
 import { InvoiceFeeService } from '../fee/invoice-fee.service';
+import { CardPaymentService } from 'src/modules/Api/collection/card/service/card-payment.service';
+import { ValidateCardOtpDto } from 'src/modules/Api/collection/card/dto/card.dto';
 import { Businesses } from 'src/modules/businesses/entity/business.entity';
 import {
   INVOICE_ACTIVE_PAYMENT_ATTEMPT_WINDOW_MS,
@@ -73,6 +75,7 @@ export class OrganisationInvoiceService {
     private readonly invoiceTransactionRepo: Repository<InvoicePaymentTransaction>,
     @InjectRepository(InvoiceItem)
     private readonly invoiceItemRepo: Repository<InvoiceItem>,
+    private readonly cardPaymentService: CardPaymentService,
   ) {}
 
   async createInvoice(input: CreateInvoice) {
@@ -695,6 +698,10 @@ export class OrganisationInvoiceService {
       invoicePaymentTransactionId: attempt.invoiceTransactionReference,
       ...result,
     };
+  }
+
+  async validateCardOtp(input: ValidateCardOtpDto) {
+    return this.cardPaymentService.validateOtpByReference(input);
   }
 
   private validateFormDetails(
