@@ -1,5 +1,7 @@
 import { TransferQueJobData } from '../../job/transfer-queue-job';
 import {
+  AccountBalance,
+  AccountBalanceEnquiry,
   TransactionQueryStatus,
   TransactionStatusQuery,
   TransferProvider,
@@ -12,4 +14,6 @@ export interface TransferAdapter {
   transactionStatusQuery(
     input: TransactionStatusQuery,
   ): Promise<TransactionQueryStatus>;
+
+  accountBalanceEnquiry(input: AccountBalanceEnquiry): Promise<AccountBalance>;
 }

@@ -28,6 +28,7 @@ import { TaxManagementModule } from './modules/tax-management/tax-management.mod
 import { FeatureManagementModule } from './modules/admin-management/feature-management/feature-management.module';
 import { PaginationInterceptor } from './shared/http/pagination.interceptor';
 import { TokenModule } from './modules/token-management/token.module';
+import { InternalPaymentSwipeModule } from './modules/Api/internal-sweep/internal-sweep.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { TokenModule } from './modules/token-management/token.module';
     TaxManagementModule,
     FeatureManagementModule,
     TokenModule,
+    InternalPaymentSwipeModule,
   ],
   controllers: [AppController],
   providers: [

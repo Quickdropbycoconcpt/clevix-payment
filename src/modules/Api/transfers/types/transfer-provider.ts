@@ -12,6 +12,16 @@ export type TransactionStatusQuery = {
   reference: string;
 };
 
+export type AccountBalanceEnquiry = {
+  environment: string;
+  accountNumber: string;
+};
+
+export type AccountBalance = {
+  accountNumber: string;
+  balance: string;
+};
+
 export type TransactionQueryStatus = {
   success: boolean;
   sessionId: string;

@@ -731,6 +731,7 @@ export class VfdClient {
     clientId: string;
     accountId: string;
     client: string;
+    accountBalance: string;
     accountNo: string;
   }> {
     try {
@@ -745,8 +746,9 @@ export class VfdClient {
           ),
         ),
       );
-      const { accountNo, client, clientId, accountId } = response.data.data;
-      return { clientId, client, accountNo, accountId };
+      const { accountNo, client, clientId, accountId, accountBalance } =
+        response.data.data;
+      return { clientId, client, accountNo, accountId, accountBalance };
     } catch (error) {
       this.logger.error(error);
     }
