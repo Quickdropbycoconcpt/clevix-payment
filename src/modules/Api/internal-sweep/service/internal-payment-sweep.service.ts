@@ -48,7 +48,7 @@ export class InternalPaymentSweepService {
     @InjectRepository(SweepPaymentTransactions)
     private readonly sweepTransactionRepo: Repository<SweepPaymentTransactions>,
   ) {}
-  private readonly mainCorporateAccount = '';
+  private readonly mainCorporateAccount = '1038227462';
   async sweepCorporateToStatic(input: StaticAccountSweep) {
     const staticAccount = await this.getStaticAccount(
       input.staticAccountNumber,
@@ -108,7 +108,7 @@ export class InternalPaymentSweepService {
     });
   }
 
-  @Cron(CronExpression.EVERY_30_MINUTES)
+  @Cron(CronExpression.EVERY_10_MINUTES)
   async VFDLUXSWEEP() {
     const subAccountNumber = process.env.VFD_LUX;
 
