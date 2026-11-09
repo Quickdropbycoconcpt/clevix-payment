@@ -108,7 +108,7 @@ export class InternalPaymentSweepService {
     });
   }
 
-  // @Cron(CronExpression.EVERY_10_MINUTES)
+  @Cron(CronExpression.EVERY_10_MINUTES)
   async VFDLUXSWEEP() {
     const subAccountNumber = process.env.VFD_LUX;
 
