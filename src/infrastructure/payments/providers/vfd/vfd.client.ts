@@ -749,8 +749,10 @@ export class VfdClient {
       const { accountNo, client, clientId, accountId, accountBalance } =
         response.data.data;
       return { clientId, client, accountNo, accountId, accountBalance };
-    } catch (error) {
-      this.logger.error(error);
+    } catch (error: any) {
+      this.logger.error(
+        JSON.stringify(error?.response?.data ?? { message: error?.message }),
+      );
     }
   }
 
