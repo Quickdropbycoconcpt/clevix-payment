@@ -499,7 +499,7 @@ export class VfdClient {
         message: responseData?.message ?? cardData?.narration,
       };
     } catch (error: any) {
-      this.logger.error(error?.response);
+      this.logger.error(error);
       throw new BadRequestException(
         error?.response?.data?.message ?? 'Unable to validate payment OTP',
       );
