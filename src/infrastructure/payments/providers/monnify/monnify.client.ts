@@ -274,7 +274,7 @@ export class MonnifyClient {
     return this.request(
       environment,
       'get',
-      `/api/v1/disbursements/account/validate?accountNumber=${encodeURIComponent(
+      `/api/v2/disbursements/account/validate?accountNumber=${encodeURIComponent(
         accountNumber,
       )}&bankCode=${encodeURIComponent(bankCode)}`,
       undefined,
