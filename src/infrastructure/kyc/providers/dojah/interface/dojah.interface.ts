@@ -13,10 +13,11 @@ export type DojahNinLookupResult = {
   firstName: string;
   lastName: string;
   middleName?: string;
+  gender: string;
   dateOfBirth: string;
   phoneNumber?: string;
   address?: string;
-  raw: unknown;
+  raw?: unknown;
 };
 
 export type DojahFaceMatchInput = {
@@ -26,7 +27,12 @@ export type DojahFaceMatchInput = {
 
 export type DojahFaceMatchResult = {
   bvn: string;
+  firstName: string;
+  lastName: string;
+  middleName: string;
+  dateOfBirth: string;
+  phoneNumber: string;
+  gender: string;
   match: boolean;
   confidence?: number;
-  raw: unknown;
 };

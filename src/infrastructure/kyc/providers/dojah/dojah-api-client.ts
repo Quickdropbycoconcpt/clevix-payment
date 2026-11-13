@@ -24,7 +24,7 @@ export class DojahApiClient {
       );
 
       const entity = response.data?.entity ?? {};
-      console.log(entity);
+
       return {
         bvn: entity.bvn ?? bvn,
         firstName: entity.first_name,
@@ -53,16 +53,16 @@ export class DojahApiClient {
       );
 
       const entity = response.data?.entity ?? {};
-      console.log(entity);
+
       return {
         nin: entity.nin ?? nin,
-        firstName: entity.firstname,
-        lastName: entity.surname,
-        middleName: entity.middlename || undefined,
-        dateOfBirth: entity.birthdate,
-        phoneNumber: entity.telephoneno || undefined,
+        firstName: entity.first_name,
+        lastName: entity.last_name,
+        middleName: entity.middle_name || undefined,
+        dateOfBirth: entity.date_of_birth,
+        gender: entity.gender,
+        phoneNumber: entity.phone_number1 || undefined,
         address: entity.residence_address || undefined,
-        raw: response.data,
       };
     } catch (error: any) {
       this.logProviderError('ninLookup', error);
@@ -93,9 +93,14 @@ export class DojahApiClient {
 
       return {
         bvn: entity.bvn ?? input.bvn,
+        firstName: entity.first_name,
+        lastName: entity.last_name,
+        middleName: entity.middle_name || undefined,
+        dateOfBirth: entity.date_of_birth,
+        phoneNumber: entity.phone_number1,
+        gender: entity.gender,
         match: selfieVerification.match ?? false,
         confidence: selfieVerification.confidence_value,
-        raw: response.data,
       };
     } catch (error: any) {
       this.logProviderError('identityWithFaceMatch', error);
