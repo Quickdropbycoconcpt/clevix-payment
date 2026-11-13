@@ -223,8 +223,7 @@ export class MonnifyClient {
         destinationBankCode: input.destinationBankCode,
         destinationAccountNumber: input.destinationAccountNumber,
         currency: 'NGN',
-        sourceAccountNumber:
-          input.sourceAccountNumber ?? credentials.walletAccountNumber,
+        sourceAccountNumber: credentials.walletAccountNumber,
       },
       'singleTransfer',
     );
