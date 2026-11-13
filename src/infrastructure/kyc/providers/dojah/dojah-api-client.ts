@@ -24,7 +24,7 @@ export class DojahApiClient {
       );
 
       const entity = response.data?.entity ?? {};
-
+      console.log(entity);
       return {
         bvn: entity.bvn ?? bvn,
         firstName: entity.first_name,
@@ -53,7 +53,7 @@ export class DojahApiClient {
       );
 
       const entity = response.data?.entity ?? {};
-
+      console.log(entity);
       return {
         nin: entity.nin ?? nin,
         firstName: entity.firstname,
