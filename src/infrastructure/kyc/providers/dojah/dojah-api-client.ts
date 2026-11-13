@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -10,6 +10,8 @@ import {
 
 @Injectable()
 export class DojahApiClient {
+  private readonly logger = new Logger(DojahApiClient.name);
+
   constructor(private readonly httpService: HttpService) {}
 
   async bvnLookup(bvn: string): Promise<DojahBvnLookupResult> {
@@ -33,6 +35,7 @@ export class DojahApiClient {
         raw: response.data,
       };
     } catch (error: any) {
+      this.logProviderError('bvnLookup', error);
       throw new BadRequestException(
         error?.response?.data?.error ?? error.message,
         error,
@@ -62,6 +65,7 @@ export class DojahApiClient {
         raw: response.data,
       };
     } catch (error: any) {
+      this.logProviderError('ninLookup', error);
       throw new BadRequestException(
         error?.response?.data?.error ?? error.message,
         error,
@@ -94,11 +98,20 @@ export class DojahApiClient {
         raw: response.data,
       };
     } catch (error: any) {
+      this.logProviderError('identityWithFaceMatch', error);
       throw new BadRequestException(
         error?.response?.data?.error ?? error.message,
         error,
       );
     }
+  }
+
+  private logProviderError(operation: string, error: any) {
+    this.logger.error(
+      `Dojah ${operation} failed status=${error?.response?.status ?? 'none'} response=${JSON.stringify(
+        error?.response?.data ?? { message: error?.message },
+      )}`,
+    );
   }
 
   private get baseUrl(): string {
