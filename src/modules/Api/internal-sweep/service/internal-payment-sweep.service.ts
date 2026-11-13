@@ -19,6 +19,7 @@ import {
   SweepType,
 } from '../interface/sweep-transfer.interface';
 import { InternalCoporateAccount } from '../entity/internal-accounts.entity';
+import { TransferStatusResult } from 'src/modules/Api/transfers/types/transfer-provider';
 import { SweepPaymentTransactions } from '../entity/sweep-transactions.entity';
 
 type ExecuteSweepInput = {
@@ -179,7 +180,7 @@ export class InternalPaymentSweepService {
             reference: sweep.reference,
           });
 
-          if (!result.success) {
+          if (result.status !== TransferStatusResult.SUCCESS) {
             return;
           }
 

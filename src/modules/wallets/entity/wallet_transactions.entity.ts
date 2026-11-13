@@ -34,6 +34,9 @@ export class WalletTransactions extends BaseEntity {
   @Column({ type: 'varchar', nullable: true })
   providerReference: string | null;
 
+  @Column({ type: 'varchar', nullable: true })
+  provider: string | null;
+
   @Column({ type: 'enum', enum: WalletTransactionType })
   transactionType: WalletTransactionType;
 

@@ -10,13 +10,16 @@ import {
 } from 'typeorm';
 
 @Entity('banks')
-@Index(['countryId', 'bankCode'], { unique: true })
+@Index(['countryId', 'bankCode', 'provider'], { unique: true })
 export class Banks extends NonEnvironmentBaseEntity {
   @PrimaryGeneratedColumn('uuid')
   bankId: string;
 
   @Column({ type: 'varchar' })
   name: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  provider: string;
 
   @Column({ type: 'varchar' })
   bankCode: string;

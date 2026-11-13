@@ -21,6 +21,7 @@ import {
   AccountValidation,
   TransactionQueryStatus,
   TransactionStatusQuery,
+  TransferStatusResult,
 } from 'src/modules/Api/transfers/types/transfer-provider';
 import {
   base64Encoded,
@@ -798,24 +799,36 @@ export class VfdClient {
           ),
         ),
       );
-      if (!response?.data?.data?.transactionStatus) {
-        return {
-          success: false,
-          sessionId: response?.data?.data?.sessionId,
-          reference,
-        };
-      }
-      return response.data.data.transactionStatus == '00'
-        ? { success: true, sessionId: response.data.data.sessionId, reference }
-        : {
-            success: false,
-            sessionId: response?.data?.data?.sessionId,
-            reference,
-          };
-    } catch (error) {
-      this.logger.error(error);
-      return { success: false, sessionId: null, reference: input.reference };
+      const providerStatus = response?.data?.data?.transactionStatus;
+
+      return {
+        status: this.toTransferStatusResult(providerStatus),
+        providerStatus,
+        sessionId: response?.data?.data?.sessionId,
+        reference,
+      };
+    } catch (error: any) {
+      this.logger.error(
+        JSON.stringify(error?.response?.data ?? { message: error?.message }),
+      );
+      return {
+        status: TransferStatusResult.PENDING,
+        sessionId: null,
+        reference: input.reference,
+      };
     }
+  }
+
+  private toTransferStatusResult(providerStatus?: string): TransferStatusResult {
+    if (providerStatus === '00') {
+      return TransferStatusResult.SUCCESS;
+    }
+
+    if (!providerStatus || providerStatus === '09') {
+      return TransferStatusResult.PENDING;
+    }
+
+    return TransferStatusResult.FAILED;
   }
 
   async bvnImageMatch(input: {

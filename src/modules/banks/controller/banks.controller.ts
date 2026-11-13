@@ -1,6 +1,7 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/modules/authentication/guards/jwt-auth.guard';
+import { Public } from 'src/modules/authentication/decorators/public.decorator';
 import { BanksService } from 'src/modules/Api/banks/service/banks.service';
 import { ValidateAccountDto } from 'src/modules/Api/banks/dto/banks.dto';
 
@@ -20,5 +21,16 @@ export class DashboardBanksController {
   @Get('validate')
   async validateBank(@Query() dto?: ValidateAccountDto) {
     return this.banksService.validateBankAccount(dto);
+  }
+
+  @Public()
+  @Post('sync')
+  @ApiQuery({
+    name: 'provider',
+    required: false,
+    description: 'Defaults to the active transfer provider',
+  })
+  async syncBanks(@Query('provider') provider?: string) {
+    return this.banksService.syncBanksFromProvider(provider);
   }
 }

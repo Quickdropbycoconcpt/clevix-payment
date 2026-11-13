@@ -7,6 +7,7 @@ export type AccountValidationResult = {};
 
 export enum BankProvider {
   VFD = 'vfd',
+  MONNIFY = 'monnify',
 }
 
 export interface BankDirectoryAdapter {

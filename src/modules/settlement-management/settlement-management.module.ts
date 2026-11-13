@@ -19,6 +19,7 @@ import { SettlementQueue } from './jobs/settlement.queue';
 import { SettlementProcessor } from './jobs/settlement.processor';
 import { TransferAdapterFactory } from '../Api/transfers/adapters/transfer.adapter.factory';
 import { VfdModule } from 'src/infrastructure/payments/providers/vfd/vfd.module';
+import { MonnifyModule } from 'src/infrastructure/payments/providers/monnify/monnify.module';
 import { Banks } from '../Api/banks/entity/banks.entity';
 import { Wallets } from '../wallets/entity/wallet.entity';
 import { WalletTransactions } from '../wallets/entity/wallet_transactions.entity';
@@ -26,6 +27,7 @@ import { FeesModule } from '../fees-configuration/fees.module';
 import { TransactionModule } from '../transactions/transactions.module';
 import { TransactionFeesModule } from '../transaction_fees/transaction-fees.module';
 import { LedgerModule } from '../ledger/ledger.module';
+import { ProvidersManagementModule } from '../Api/providers/providers.management.module';
 
 @Module({
   imports: [
@@ -44,10 +46,12 @@ import { LedgerModule } from '../ledger/ledger.module';
       name: SETTLEMENT_QUEUE,
     }),
     VfdModule,
+    MonnifyModule,
     FeesModule,
     TransactionModule,
     TransactionFeesModule,
     LedgerModule,
+    ProvidersManagementModule,
   ],
   controllers: [SettlementController, SettlementTransactionsController],
   providers: [

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RedisConfig } from 'src/infrastructure/redis/redis.config';
@@ -8,11 +8,17 @@ import {
   SettlementTransactionStatus,
 } from '../entity/settlement_transactions.entity';
 import { Settlements } from '../entity/settlements.entity';
-import { RequestEnvironment, LedgerEntryDirection } from 'src/shared/enum';
+import {
+  RequestEnvironment,
+  LedgerEntryDirection,
+  ProviderServiceType,
+} from 'src/shared/enum';
 import { SettlementQueue } from '../jobs/settlement.queue';
 import { ExternalBankSettlement } from '../interface/business-settlement-config.interface';
 import { TransferAdapterFactory } from 'src/modules/Api/transfers/adapters/transfer.adapter.factory';
-import { TransferProvider } from 'src/modules/Api/transfers/types/transfer-provider';
+import { TransferStatusResult } from 'src/modules/Api/transfers/types/transfer-provider';
+import { ProviderService } from 'src/modules/Api/providers/service/providers.service';
+import { BanksService } from 'src/modules/Api/banks/service/banks.service';
 import { LedgerService } from 'src/modules/ledger/service/ledger.service';
 import {
   LedgerAccountOwnerType,
@@ -39,6 +45,8 @@ export class SettlementEngineService {
     private readonly settlementQueue: SettlementQueue,
     private readonly transferAdapterFactory: TransferAdapterFactory,
     private readonly ledgerService: LedgerService,
+    private readonly providerService: ProviderService,
+    private readonly banksService: BanksService,
   ) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
@@ -85,12 +93,11 @@ export class SettlementEngineService {
     settlementTransaction: SettlementTransactions,
     input: ExternalBankSettlement,
   ) {
-    const provider = TransferProvider.VFD;
     const attempt = await this.getOrCreateExternalPayoutAttempt(
       settlementTransaction,
       input,
-      provider,
     );
+    const provider = attempt.provider;
 
     if (
       [
@@ -105,7 +112,7 @@ export class SettlementEngineService {
     const adapter = this.transferAdapterFactory.getTransferdapter(provider);
     const payoutInput = {
       amount: input.amount,
-      bankCode: input.bankCode,
+      bankCode: attempt.destinationBankCode,
       merchantReference: input.merchantReference ?? attempt.reference,
       reference: attempt.reference,
       narration: input.narration ?? 'Settlement payout',
@@ -178,7 +185,6 @@ export class SettlementEngineService {
   private async getOrCreateExternalPayoutAttempt(
     settlementTransaction: SettlementTransactions,
     input: ExternalBankSettlement,
-    provider: TransferProvider,
   ) {
     const existingAttempt = await this.payoutAttemptRepo.findOne({
       where: {
@@ -193,6 +199,21 @@ export class SettlementEngineService {
       existingAttempt.status !== SettlementPayoutAttemptStatus.FAILED
     ) {
       return existingAttempt;
+    }
+
+    const { value: provider } =
+      await this.providerService.getActiveProviderForService(
+        ProviderServiceType.TRANSFER,
+      );
+    const bankCode = await this.banksService.getProviderBankCode(
+      input.bankId,
+      provider,
+    );
+
+    if (!bankCode) {
+      throw new BadRequestException(
+        `Bank ${input.bankId} is not linked for ${provider}; settlement ${settlementTransaction.settlementTransactionsId} not sent`,
+      );
     }
 
     const reference = existingAttempt
@@ -212,7 +233,7 @@ export class SettlementEngineService {
         currency: input.currency,
         destinationAccountNumber: input.accountNumber,
         destinationAccountName: input.accountName,
-        destinationBankCode: input.bankCode,
+        destinationBankCode: bankCode,
         status: SettlementPayoutAttemptStatus.PENDING,
         failureReason: null,
         requestedAt: null,
@@ -249,17 +270,16 @@ export class SettlementEngineService {
         return;
       }
 
-      const adapter = this.transferAdapterFactory.getTransferdapter(
-        TransferProvider.VFD,
-      );
-
       for (const attempt of processingAttempts) {
+        const adapter = this.transferAdapterFactory.getTransferdapter(
+          attempt.provider,
+        );
         const result = await adapter.transactionStatusQuery({
           environment: attempt.environment,
           reference: attempt.reference,
         });
 
-        if (!result.success) {
+        if (result.status !== TransferStatusResult.SUCCESS) {
           continue;
         }
 

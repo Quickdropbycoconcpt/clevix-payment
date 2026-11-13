@@ -1,6 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { VfdModule } from 'src/infrastructure/payments/providers/vfd/vfd.module';
+import { MonnifyModule } from 'src/infrastructure/payments/providers/monnify/monnify.module';
 import { CollectionAdapterFactory } from '../adapters/collection.adapter.factory';
 import { VirtualAccountsController } from './controllers/virtual-accounts.controllers';
 import { VirtualAccountsService } from './service/virtual-accounts.service';
@@ -21,6 +22,7 @@ import { SettlementManagementModule } from 'src/modules/settlement-management/se
       name: VIRTUAL_ACCOUNT_CREDIT_QUEUE,
     }),
     VfdModule,
+    MonnifyModule,
     TransactionModule,
     ReconciliationModule,
     SettlementManagementModule,

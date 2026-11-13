@@ -1,5 +1,6 @@
 export enum TransferProvider {
   VFD = 'vfd',
+  MONNIFY = 'monnify',
 }
 
 export interface AccountValidation {
@@ -22,9 +23,15 @@ export type AccountBalance = {
   balance: string;
 };
 
+export enum TransferStatusResult {
+  SUCCESS = 'SUCCESS',
+  PENDING = 'PENDING',
+  FAILED = 'FAILED',
+}
+
 export type TransactionQueryStatus = {
-  success: boolean;
+  status: TransferStatusResult;
+  providerStatus?: string;
   sessionId: string;
-  status?: string;
   reference: string;
 };

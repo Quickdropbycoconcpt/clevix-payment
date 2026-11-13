@@ -4,13 +4,18 @@ import {
   BankProvider,
 } from './adapters/banks.adapter';
 import { VfdBanksManagementAdapter } from 'src/infrastructure/payments/providers/vfd/vfd-adapter/vfd-banks-adapter';
+import { MonnifyBanksManagementAdapter } from 'src/infrastructure/payments/providers/monnify/monnify-adapter/monnify-banks-adapter';
 
 @Injectable()
 export class BanksAdapterFactory {
   private readonly bankAdapters = new Map<BankProvider, BankDirectoryAdapter>();
 
-  constructor(private readonly vfdBanksAdapter: VfdBanksManagementAdapter) {
+  constructor(
+    private readonly vfdBanksAdapter: VfdBanksManagementAdapter,
+    private readonly monnifyBanksAdapter: MonnifyBanksManagementAdapter,
+  ) {
     this.bankAdapters.set(BankProvider.VFD, this.vfdBanksAdapter);
+    this.bankAdapters.set(BankProvider.MONNIFY, this.monnifyBanksAdapter);
   }
 
   getBankAdapter(provider: string): BankDirectoryAdapter {

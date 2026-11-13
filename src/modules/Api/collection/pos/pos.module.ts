@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { VfdModule } from 'src/infrastructure/payments/providers/vfd/vfd.module';
+import { MonnifyModule } from 'src/infrastructure/payments/providers/monnify/monnify.module';
 import { BusinessModule } from 'src/modules/businesses/business.module';
 import { TransactionModule } from 'src/modules/transactions/transactions.module';
 import { WalletModule } from 'src/modules/wallets/wallets.module';
@@ -16,6 +17,7 @@ import { PosTerminalService } from './service/pos_terminal.service';
   imports: [
     TypeOrmModule.forFeature([PosTransactions, Terminal]),
     VfdModule,
+    MonnifyModule,
     WalletModule,
     TransactionModule,
     BusinessModule,

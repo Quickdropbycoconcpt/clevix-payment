@@ -6,12 +6,15 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Country } from 'src/modules/country-and-states/entity/country.entity';
-import { ILike, In, Repository } from 'typeorm';
-import { BankDefinition, BankProvider } from '../adapters/banks.adapter';
+import { ILike, In, IsNull, Not, Repository } from 'typeorm';
+import { BankDefinition } from '../adapters/banks.adapter';
 import { BanksAdapterFactory } from '../banks-adapter-factory';
 import { Banks } from '../entity/banks.entity';
+import { ProviderBank } from '../entity/provider-bank.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { ValidateAccountDto } from '../dto/banks.dto';
+import { ProviderService } from 'src/modules/Api/providers/service/providers.service';
+import { ProviderServiceType } from 'src/shared/enum';
 
 @Injectable()
 export class BanksService {
@@ -19,27 +22,47 @@ export class BanksService {
 
   constructor(
     private readonly banksAdapterFactory: BanksAdapterFactory,
+    private readonly providerService: ProviderService,
     @InjectRepository(Banks)
     private readonly banksRepo: Repository<Banks>,
+    @InjectRepository(ProviderBank)
+    private readonly providerBankRepo: Repository<ProviderBank>,
     @InjectRepository(Country)
     private readonly countryRepo: Repository<Country>,
   ) {}
 
   async getBanks(name?: string): Promise<BankDefinition[]> {
     const searchName = name?.trim();
-    const banks = await this.banksRepo.find({
-      where: searchName ? { name: ILike(`%${searchName}%`) } : undefined,
-      order: { name: 'ASC' },
+    const provider = await this.getTransferProvider();
+    const providerBanks = await this.providerBankRepo.find({
+      where: {
+        provider,
+        bankId: Not(IsNull()),
+        bank: {
+          deletedAt: IsNull(),
+          ...(searchName ? { name: ILike(`%${searchName}%`) } : {}),
+        },
+      },
+      relations: { bank: true },
+      order: { bank: { name: 'ASC' } },
     });
-    return banks.map((bank) => ({
-      bankId: bank.bankId,
-      name: bank.name,
-      bankCode: bank.bankCode,
+
+    return providerBanks.map((providerBank) => ({
+      bankId: providerBank.bankId,
+      name: providerBank.bank.name,
+      bankCode: providerBank.bankCode,
     }));
   }
 
-  async syncBanksFromProvider(): Promise<void> {
-    const adapter = this.banksAdapterFactory.getBankAdapter(BankProvider.VFD);
+  async syncBanksFromProvider(providerValue?: string): Promise<{
+    provider: string;
+    total: number;
+    linked: number;
+    unlinked: number;
+  }> {
+    const provider =
+      providerValue?.trim().toLowerCase() ?? (await this.getTransferProvider());
+    const adapter = this.banksAdapterFactory.getBankAdapter(provider);
     const providerBanks = await adapter.getBanks();
     const country = await this.countryRepo.findOne({
       where: { countryCode: 'NG' },
@@ -48,14 +71,6 @@ export class BanksService {
     if (!country) {
       throw new NotFoundException('Nigeria country record not found');
     }
-
-    const existingBanks = await this.banksRepo.find({
-      where: { countryId: country.countryId },
-      withDeleted: true,
-    });
-    const banksByCode = new Map(
-      existingBanks.map((bank) => [bank.bankCode, bank]),
-    );
 
     const providerBanksByCode = new Map<string, BankDefinition>();
     providerBanks.forEach((bank) => {
@@ -67,25 +82,107 @@ export class BanksService {
       }
     });
 
-    const banks = Array.from(providerBanksByCode.values()).map((bank) => {
-      const existingBank = banksByCode.get(bank.bankCode);
+    const counts = { linked: 0, unlinked: 0 };
 
-      return this.banksRepo.create({
-        ...existingBank,
-        name: bank.name,
-        bankCode: bank.bankCode,
-        countryId: country.countryId,
-        deletedAt: null,
+    await this.banksRepo.manager.transaction(async (manager) => {
+      const banksRepo = manager.getRepository(Banks);
+      const providerBankRepo = manager.getRepository(ProviderBank);
+      const isBootstrap = (await banksRepo.count({ withDeleted: true })) === 0;
+
+      const ownRows = await providerBankRepo.find({
+        where: { provider },
+        withDeleted: true,
       });
+      const ownRowsByCode = new Map(ownRows.map((row) => [row.bankCode, row]));
+
+      const otherLinkedRows = await providerBankRepo.find({
+        where: { provider: Not(provider), bankId: Not(IsNull()) },
+      });
+      const bankIdsByCode = new Map<string, Set<string>>();
+      otherLinkedRows.forEach((row) => {
+        const bankIds = bankIdsByCode.get(row.bankCode) ?? new Set<string>();
+        bankIds.add(row.bankId);
+        bankIdsByCode.set(row.bankCode, bankIds);
+      });
+
+      const createdBankIdsByCode = new Map<string, string>();
+
+      if (isBootstrap) {
+        const createdBanks = await banksRepo.save(
+          Array.from(providerBanksByCode.values()).map((bank) =>
+            banksRepo.create({
+              name: bank.name,
+              bankCode: bank.bankCode,
+              provider,
+              countryId: country.countryId,
+            }),
+          ),
+        );
+        createdBanks.forEach((bank) =>
+          createdBankIdsByCode.set(bank.bankCode, bank.bankId),
+        );
+      }
+
+      const rows: ProviderBank[] = [];
+
+      for (const bank of providerBanksByCode.values()) {
+        const row =
+          ownRowsByCode.get(bank.bankCode) ??
+          providerBankRepo.create({ provider, bankCode: bank.bankCode });
+
+        row.name = bank.name;
+        row.deletedAt = null;
+
+        if (!row.bankId) {
+          row.bankId = isBootstrap
+            ? createdBankIdsByCode.get(bank.bankCode)
+            : this.resolveBankIdByCode(bankIdsByCode, bank.bankCode, provider);
+        }
+
+        if (row.bankId) {
+          counts.linked += 1;
+        } else {
+          counts.unlinked += 1;
+        }
+
+        rows.push(row);
+      }
+
+      await providerBankRepo.save(rows);
     });
 
-    await this.banksRepo.save(banks);
+    this.logger.log(
+      `Synced ${providerBanksByCode.size} banks from ${provider}: linked=${counts.linked} unlinked=${counts.unlinked}`,
+    );
 
-    this.logger.log(`Synced ${banks.length} banks from ${BankProvider.VFD}`);
+    return { provider, total: providerBanksByCode.size, ...counts };
+  }
+
+  private resolveBankIdByCode(
+    bankIdsByCode: Map<string, Set<string>>,
+    bankCode: string,
+    provider: string,
+  ): string | null {
+    const bankIds = bankIdsByCode.get(bankCode);
+
+    if (!bankIds) {
+      return null;
+    }
+
+    if (bankIds.size > 1) {
+      this.logger.warn(
+        `Bank code ${bankCode} from ${provider} matches ${bankIds.size} different banks; left unlinked`,
+      );
+      return null;
+    }
+
+    return bankIds.values().next().value;
   }
 
   async validateBankAccount(body: ValidateAccountDto) {
-    const adapter = this.banksAdapterFactory.getBankAdapter(BankProvider.VFD);
+    const adapter = this.banksAdapterFactory.getBankAdapter(
+      await this.getTransferProvider(),
+    );
     try {
       return await adapter.validateAccountNumber(
         body.accountNumber,
@@ -99,11 +196,30 @@ export class BanksService {
     }
   }
 
+  async getProviderBankCode(
+    bankId: string,
+    provider: string,
+  ): Promise<string | null> {
+    const providerBank = await this.providerBankRepo.findOne({
+      where: { bankId, provider },
+    });
+
+    return providerBank?.bankCode ?? null;
+  }
+
   async getBanksInId(ids: string[]) {
     return await this.banksRepo.find({
       where: {
         bankId: In(ids),
       },
     });
+  }
+
+  private async getTransferProvider(): Promise<string> {
+    const provider = await this.providerService.getActiveProviderForService(
+      ProviderServiceType.TRANSFER,
+    );
+
+    return provider.value;
   }
 }

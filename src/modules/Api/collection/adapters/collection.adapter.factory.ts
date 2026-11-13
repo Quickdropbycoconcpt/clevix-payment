@@ -9,6 +9,8 @@ import { PosAdapter } from './contracts/pos.adapter';
 import { VirtualAccountAdapter } from './contracts/virtual-account.adapter';
 import { VfdCardProvider } from 'src/infrastructure/payments/providers/vfd/vfd-adapter/vfd-card-payment.adapter';
 import { CardPaymentAdapter } from './contracts/card-payment.adapter';
+import { MonnifyVirtualAccountProvider } from 'src/infrastructure/payments/providers/monnify/monnify-adapter/monnify-virtual-account-adapter';
+import { MonnifyCardProvider } from 'src/infrastructure/payments/providers/monnify/monnify-adapter/monnify-card-payment.adapter';
 
 @Injectable()
 export class CollectionAdapterFactory {
@@ -27,13 +29,20 @@ export class CollectionAdapterFactory {
     private readonly vfdVirtualAccountProvider: VfdVirtualAccountProvider,
     private readonly vfdPosProvider: VfdPosProvider,
     private readonly vfdCardProvider: VfdCardProvider,
+    private readonly monnifyVirtualAccountProvider: MonnifyVirtualAccountProvider,
+    private readonly monnifyCardProvider: MonnifyCardProvider,
   ) {
     this.virtualAccountAdapters.set(
       CollectionProvider.VFD,
       this.vfdVirtualAccountProvider,
     );
+    this.virtualAccountAdapters.set(
+      CollectionProvider.MONNIFY,
+      this.monnifyVirtualAccountProvider,
+    );
     this.posAdapters.set(CollectionProvider.VFD, this.vfdPosProvider);
     this.cardAdapters.set(CollectionProvider.VFD, this.vfdCardProvider);
+    this.cardAdapters.set(CollectionProvider.MONNIFY, this.monnifyCardProvider);
   }
 
   getVirtualAccountAdapter(provider: string): VirtualAccountAdapter {

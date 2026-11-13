@@ -19,7 +19,7 @@ export type ExternalBankSettlement = {
 
   currency: string;
 
-  bankCode: string;
+  bankId: string;
 
   reference: string;
 

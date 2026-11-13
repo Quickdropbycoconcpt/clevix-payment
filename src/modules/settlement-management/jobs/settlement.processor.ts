@@ -85,7 +85,7 @@ export class SettlementProcessor extends WorkerHost {
           accountNumber:
             settlementTransaction.settlementBankAccount.accountNumber,
           accountName: settlementTransaction.settlementBankAccount.accountName,
-          bankCode: settlementTransaction.settlementBankAccount.bank.bankCode,
+          bankId: settlementTransaction.settlementBankAccount.providerbankId,
           currency: 'NGN',
           reference: settlementTransaction.settlementTransactionsId,
           environment: settlementTransaction.environment,

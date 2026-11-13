@@ -3,6 +3,8 @@ import AppDataSource from '../database/typeorm.data-source';
 import { seedNigeria } from './nigeria';
 import { seedPermissions } from './permissions';
 import { seedPlatformMandatoryFields } from './platform-mandatory-fields';
+import { seedProviders } from './providers';
+import { seedPlatformFees } from './platform-fees';
 
 type Seeder = {
   name: string;
@@ -21,6 +23,14 @@ const seeders: Seeder[] = [
   {
     name: 'Platform mandatory fields',
     run: seedPlatformMandatoryFields,
+  },
+  {
+    name: 'Providers',
+    run: seedProviders,
+  },
+  {
+    name: 'Platform fee configuration',
+    run: seedPlatformFees,
   },
 ];
 

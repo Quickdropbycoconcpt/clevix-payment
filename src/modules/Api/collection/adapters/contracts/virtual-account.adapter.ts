@@ -22,6 +22,7 @@ export type CreateIndividualStaticAccount = {
   dob: string;
   nin: string;
   address: string;
+  customerEmail?: string;
 };
 
 export type CreateCorporateStaticAccount = {
@@ -34,6 +35,7 @@ export type CreateCorporateStaticAccount = {
   businessType: string;
   address: string;
   state: string;
+  customerEmail?: string;
 };
 
 export type VirtualAccountCreditResponse = {

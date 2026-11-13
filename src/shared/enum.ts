@@ -98,6 +98,13 @@ export enum WalletTransactionSource {
   INTERNAL_TRANSFER = 'INTERNAL_TRANSFER',
 }
 
+export enum ProviderServiceType {
+  TRANSFER = 'TRANSFER',
+  VIRTUAL_ACCOUNT = 'VIRTUAL_ACCOUNT',
+  CARD = 'CARD',
+  POS = 'POS',
+}
+
 export enum JobQueueList {
   MONEY_TRANSFER_PROCESSOR = 'CLEVIX_PAYMENT_MONEY_TRANSFER_PROCESSOR',
 }

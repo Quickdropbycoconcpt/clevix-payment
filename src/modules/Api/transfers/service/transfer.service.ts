@@ -2,11 +2,12 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TransferProvider } from '../types/transfer-provider';
+import { TransferStatusResult } from '../types/transfer-provider';
 import { WalletService } from 'src/modules/wallets/service/wallets.service';
 import { WithdrawalDto } from '../dto/transfer.dto';
 import { getBusinessScope, RequestScope } from 'src/shared/business-scope';
 import {
+  ProviderServiceType,
   RequestEnvironment,
   TransactionSource,
   WalletTransactionSource,
@@ -15,6 +16,7 @@ import {
 import { AddTransferIntoQue } from '../job/transfer-queue-job';
 import { TransferAdapterFactory } from '../adapters/transfer.adapter.factory';
 import { WalletTransactions } from 'src/modules/wallets/entity/wallet_transactions.entity';
+import { ProviderService } from 'src/modules/Api/providers/service/providers.service';
 
 @Injectable()
 export class TransferService {
@@ -24,6 +26,7 @@ export class TransferService {
     private readonly walletService: WalletService,
     private readonly transferQueue: AddTransferIntoQue,
     private readonly transferAdapterFactory: TransferAdapterFactory,
+    private readonly providerService: ProviderService,
     @InjectRepository(WalletTransactions)
     private readonly walletTransactionRepo: Repository<WalletTransactions>,
   ) {}
@@ -40,10 +43,10 @@ export class TransferService {
       amount,
     } = dto;
     const { businessId, environment } = scope;
-    const provider = TransferProvider.VFD; //this should be dynamic....
-    /**
-     * We determine the provider ourselves
-     */
+    const { value: provider } =
+      await this.providerService.getActiveProviderForService(
+        ProviderServiceType.TRANSFER,
+      );
     const walletTransaction = await this.walletService.debitUserWallet({
       amount,
       environment,
@@ -112,33 +115,27 @@ export class TransferService {
         return;
       }
 
-      const adapter = this.transferAdapterFactory.getTransferdapter(
-        TransferProvider.VFD,
-      );
-
       await Promise.allSettled(
         processingTransfers.map(async (transfer) => {
+          const adapter = this.transferAdapterFactory.getTransferdapter(
+            transfer.provider,
+          );
           const result = await adapter.transactionStatusQuery({
             environment: transfer.environment,
             reference: transfer.reference,
           });
           console.log(result);
-          if (!result.success) {
-            await this.walletTransactionRepo.update(
-              { walletTransactionId: transfer.walletTransactionId },
-              {
-                status: WalletTransactionStatus.FAILED,
-                providerReference:
-                  result.sessionId ?? transfer.providerReference,
-              },
-            );
+          if (result.status === TransferStatusResult.PENDING) {
             return;
           }
 
           await this.walletTransactionRepo.update(
             { walletTransactionId: transfer.walletTransactionId },
             {
-              status: WalletTransactionStatus.COMPLETED,
+              status:
+                result.status === TransferStatusResult.SUCCESS
+                  ? WalletTransactionStatus.COMPLETED
+                  : WalletTransactionStatus.FAILED,
               providerReference: result.sessionId ?? transfer.providerReference,
             },
           );

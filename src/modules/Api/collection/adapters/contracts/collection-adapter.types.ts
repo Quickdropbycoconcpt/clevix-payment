@@ -1,6 +1,7 @@
 export enum CollectionProvider {
   VFD = 'vfd',
   FCMB = 'fcmb',
+  MONNIFY = 'monnify',
 }
 
 export enum CollectionSource {

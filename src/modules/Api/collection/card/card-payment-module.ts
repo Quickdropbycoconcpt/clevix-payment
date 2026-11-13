@@ -6,6 +6,7 @@ import { CardCardPaymentsController } from './controller/card-payment.controller
 import { CardPaymentService } from './service/card-payment.service';
 import { CollectionAdapterFactory } from '../adapters/collection.adapter.factory';
 import { VfdModule } from 'src/infrastructure/payments/providers/vfd/vfd.module';
+import { MonnifyModule } from 'src/infrastructure/payments/providers/monnify/monnify.module';
 import { TransactionModule } from 'src/modules/transactions/transactions.module';
 import { CardPaymentWebhookQueue } from './jobs/card-payment-webhook.queue';
 import { CardPaymentWebhookProcessor } from './jobs/card-payment-webhook.processor';
@@ -20,6 +21,7 @@ import { SettlementManagementModule } from 'src/modules/settlement-management/se
       name: CARD_PAYMENT_WEBHOOK_QUEUE,
     }),
     VfdModule,
+    MonnifyModule,
     TransactionModule,
     ReconciliationModule,
     SettlementManagementModule,

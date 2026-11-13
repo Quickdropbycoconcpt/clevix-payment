@@ -603,6 +603,7 @@ export class WalletService {
           walletId: wallet.walletId,
           reference: input.reference,
           providerReference: input.providerReference ?? input.reference,
+          provider: input.provider,
           transactionType: WalletTransactionType.DEBIT,
           amount: totalMerchantDebit.toString(),
           availableBalanceBefore: availableBalanceBefore.toString(),
@@ -621,7 +622,6 @@ export class WalletService {
             revenue: revenue.toString(),
             merchantReference: input.merchantReference,
             reference: input.reference,
-            provider: input.provider,
           },
         }),
       );
