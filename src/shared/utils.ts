@@ -283,3 +283,36 @@ export function allocateSettlementShares(
     }),
   );
 }
+
+const DOB_MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+export function dobNormalize(dob: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dob?.trim() ?? '');
+
+  if (!match) {
+    throw new BadRequestException('Date of birth must be in YYYY-MM-DD format');
+  }
+
+  const [, year, month, day] = match;
+  const monthName = DOB_MONTHS[Number(month) - 1];
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+
+  if (!monthName || date.getUTCDate() !== Number(day)) {
+    throw new BadRequestException('Invalid date of birth');
+  }
+
+  return `${day}-${monthName}-${year}`;
+}

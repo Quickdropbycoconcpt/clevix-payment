@@ -14,7 +14,7 @@ import {
 import { RedisConfig } from 'src/infrastructure/redis/redis.config';
 import { RequestEnvironment } from 'src/shared/enum';
 import { MoneyValueConverter } from 'src/shared/converter';
-import { axiosConfig } from 'src/shared/utils';
+import { axiosConfig, dobNormalize } from 'src/shared/utils';
 import * as crypto from 'node:crypto';
 import { TransferQueJobData } from 'src/modules/Api/transfers/job/transfer-queue-job';
 import {
@@ -515,7 +515,7 @@ export class VfdClient {
       const credentials = this.credentialPicker(body.environment);
       const { bvn, address, dob, nin } = body;
       if (bvn) queryParams.append('bvn', bvn);
-      if (dob) queryParams.append('dateOfBirth', dob);
+      if (dob) queryParams.append('dateOfBirth', dobNormalize(dob));
       if (nin) queryParams.append('nin', nin);
       if (address) queryParams.append('address', address);
       const response = await this.withTokenRetry(body.environment, (token) =>
@@ -819,7 +819,9 @@ export class VfdClient {
     }
   }
 
-  private toTransferStatusResult(providerStatus?: string): TransferStatusResult {
+  private toTransferStatusResult(
+    providerStatus?: string,
+  ): TransferStatusResult {
     if (providerStatus === '00') {
       return TransferStatusResult.SUCCESS;
     }
