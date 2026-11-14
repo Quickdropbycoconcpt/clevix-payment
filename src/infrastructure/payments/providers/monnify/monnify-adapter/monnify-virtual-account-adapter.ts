@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import * as Crypto from 'node:crypto';
 import { CollectionProvider } from 'src/modules/Api/collection/adapters/contracts/collection-adapter.types';
 import {
@@ -13,6 +13,8 @@ import {
 } from 'src/modules/Api/collection/adapters/contracts/virtual-account.adapter';
 import { MoneyValueConverter } from 'src/shared/converter';
 import { MonnifyClient } from '../monnify.client';
+import { AppException } from 'src/shared/exceptions/app.exception';
+import { ErrorCode } from 'src/shared/exceptions/error-codes';
 
 type MonnifyTransactionWebhook = {
   eventType?: string;
@@ -109,8 +111,9 @@ export class MonnifyVirtualAccountProvider implements VirtualAccountAdapter {
   }
 
   async simulateIncomingCredit(): Promise<{ message: string }> {
-    throw new BadRequestException(
-      'Monnify does not support simulating incoming credits',
+    throw new AppException(
+      ErrorCode.OPERATION_NOT_SUPPORTED,
+      HttpStatus.BAD_REQUEST,
     );
   }
 
@@ -133,7 +136,10 @@ export class MonnifyVirtualAccountProvider implements VirtualAccountAdapter {
 
   private requireEmail(email?: string): string {
     if (!email?.trim()) {
-      throw new BadRequestException('Monnify requires a customer email');
+      throw new AppException(
+        ErrorCode.CUSTOMER_EMAIL_REQUIRED,
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     return email.trim();

@@ -404,7 +404,7 @@ export class VirtualAccountsService {
   private async checkProviderHeader(incomingHeader: string, provider: string) {
     const supportedProviders = ['vfd'];
     if (!supportedProviders.includes(provider)) {
-      throw new BadRequestException(`Please provide ${provider} signature`);
+      throw new UnauthorizedException('Invalid webhook credentials');
     }
 
     const expectedKey = process.env.VFD_EXPECTED_INTERNAL_KEY;

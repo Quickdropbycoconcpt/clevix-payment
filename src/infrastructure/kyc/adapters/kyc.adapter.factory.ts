@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DojahKycProvider } from '../providers/dojah/dojah-kyc.adapter';
 import { FcmbKycProvider } from '../providers/fcmb/fcmb-kyc.adapter';
 import { VfdKycProvider } from '../providers/vfd/vfd-kyc.adapter';
 import { KycAdapter, KycProvider } from './kyc.adapter';
+import { serviceConfigurationError } from 'src/shared/utils';
 
 @Injectable()
 export class KycAdapterFactory {
@@ -23,7 +24,7 @@ export class KycAdapterFactory {
     const adapter = this.kycAdapters.get(normalizedProvider);
 
     if (!adapter) {
-      throw new BadRequestException(
+      throw serviceConfigurationError(
         `${normalizedProvider} does not support KYC verification`,
       );
     }
@@ -40,6 +41,6 @@ export class KycAdapterFactory {
       return normalizedProvider as KycProvider;
     }
 
-    throw new BadRequestException(`Unsupported KYC provider: ${provider}`);
+    throw serviceConfigurationError(`Unsupported KYC provider: ${provider}`);
   }
 }

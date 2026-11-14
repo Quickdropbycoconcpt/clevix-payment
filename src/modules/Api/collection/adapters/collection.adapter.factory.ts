@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { VfdPosProvider } from 'src/infrastructure/payments/providers/vfd/vfd-adapter/vfd-pos-adapter';
 import { VfdVirtualAccountProvider } from 'src/infrastructure/payments/providers/vfd/vfd-adapter/vfd-virtual-account-adapter';
 import {
@@ -11,6 +11,7 @@ import { VfdCardProvider } from 'src/infrastructure/payments/providers/vfd/vfd-a
 import { CardPaymentAdapter } from './contracts/card-payment.adapter';
 import { MonnifyVirtualAccountProvider } from 'src/infrastructure/payments/providers/monnify/monnify-adapter/monnify-virtual-account-adapter';
 import { MonnifyCardProvider } from 'src/infrastructure/payments/providers/monnify/monnify-adapter/monnify-card-payment.adapter';
+import { serviceConfigurationError } from 'src/shared/utils';
 
 @Injectable()
 export class CollectionAdapterFactory {
@@ -50,7 +51,7 @@ export class CollectionAdapterFactory {
     const adapter = this.virtualAccountAdapters.get(normalizedProvider);
 
     if (!adapter) {
-      throw new BadRequestException(
+      throw serviceConfigurationError(
         `${normalizedProvider} does not support ${CollectionSource.VIRTUAL_ACCOUNT} collection`,
       );
     }
@@ -63,7 +64,7 @@ export class CollectionAdapterFactory {
     const adapter = this.cardAdapters.get(normalizedProvider);
 
     if (!adapter) {
-      throw new BadRequestException(
+      throw serviceConfigurationError(
         `${normalizedProvider} does not support ${CollectionSource.CARD} collection`,
       );
     }
@@ -76,7 +77,7 @@ export class CollectionAdapterFactory {
     const adapter = this.posAdapters.get(normalizedProvider);
 
     if (!adapter) {
-      throw new BadRequestException(
+      throw serviceConfigurationError(
         `${normalizedProvider} does not support ${CollectionSource.POS} collection`,
       );
     }
@@ -95,7 +96,7 @@ export class CollectionAdapterFactory {
       return normalizedProvider as CollectionProvider;
     }
 
-    throw new BadRequestException(
+    throw serviceConfigurationError(
       `Unsupported collection provider: ${provider}`,
     );
   }

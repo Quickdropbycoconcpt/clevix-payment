@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { TransferAdapter } from './contracts/transfer.adapter';
 import { TransferProvider } from '../types/transfer-provider';
 import { VfdTransferProvider } from 'src/infrastructure/payments/providers/vfd/vfd-adapter/vfd-transfer-adapter';
 import { MonnifyTransferProvider } from 'src/infrastructure/payments/providers/monnify/monnify-adapter/monnify-transfer-adapter';
+import { serviceConfigurationError } from 'src/shared/utils';
 
 @Injectable()
 export class TransferAdapterFactory {
@@ -27,7 +28,7 @@ export class TransferAdapterFactory {
     const adapter = this.transferAdapters.get(normalizedProvider);
 
     if (!adapter) {
-      throw new BadRequestException(
+      throw serviceConfigurationError(
         `${normalizedProvider} does not support transfer`,
       );
     }
@@ -46,8 +47,8 @@ export class TransferAdapterFactory {
       return normalizedProvider as TransferProvider;
     }
 
-    throw new BadRequestException(
-      `Unsupported collection provider: ${provider}`,
+    throw serviceConfigurationError(
+      `Unsupported transfer provider: ${provider}`,
     );
   }
 }

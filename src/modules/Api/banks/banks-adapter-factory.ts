@@ -1,10 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import {
-  BankDirectoryAdapter,
-  BankProvider,
-} from './adapters/banks.adapter';
+import { Injectable } from '@nestjs/common';
+import { BankDirectoryAdapter, BankProvider } from './adapters/banks.adapter';
 import { VfdBanksManagementAdapter } from 'src/infrastructure/payments/providers/vfd/vfd-adapter/vfd-banks-adapter';
 import { MonnifyBanksManagementAdapter } from 'src/infrastructure/payments/providers/monnify/monnify-adapter/monnify-banks-adapter';
+import { serviceConfigurationError } from 'src/shared/utils';
 
 @Injectable()
 export class BanksAdapterFactory {
@@ -23,7 +21,7 @@ export class BanksAdapterFactory {
     const adapter = this.bankAdapters.get(normalizedProvider);
 
     if (!adapter) {
-      throw new BadRequestException(
+      throw serviceConfigurationError(
         `${normalizedProvider} does not support bank directory lookup`,
       );
     }
@@ -40,6 +38,6 @@ export class BanksAdapterFactory {
       return normalizedProvider as BankProvider;
     }
 
-    throw new BadRequestException(`Unsupported bank provider: ${provider}`);
+    throw serviceConfigurationError(`Unsupported bank provider: ${provider}`);
   }
 }

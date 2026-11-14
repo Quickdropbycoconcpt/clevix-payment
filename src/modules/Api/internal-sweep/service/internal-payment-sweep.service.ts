@@ -21,6 +21,7 @@ import {
 import { InternalCoporateAccount } from '../entity/internal-accounts.entity';
 import { TransferStatusResult } from 'src/modules/Api/transfers/types/transfer-provider';
 import { SweepPaymentTransactions } from '../entity/sweep-transactions.entity';
+import { serviceConfigurationError } from 'src/shared/utils';
 
 type ExecuteSweepInput = {
   provider: string;
@@ -114,7 +115,7 @@ export class InternalPaymentSweepService {
     const subAccountNumber = process.env.VFD_LUX;
 
     if (!subAccountNumber) {
-      throw new BadRequestException('VFD_LUX  must be configured');
+      throw serviceConfigurationError('VFD_LUX must be configured');
     }
 
     const subAccount =
@@ -301,7 +302,7 @@ export class InternalPaymentSweepService {
     });
 
     if (!corporateAccount) {
-      throw new NotFoundException(
+      throw serviceConfigurationError(
         `No default internal corporate account configured for ${provider}`,
       );
     }

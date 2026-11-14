@@ -1,34 +1,30 @@
-import { Injectable, NotImplementedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
-  BvnImageMatchInput,
   BvnImageMatchResult,
   KycAdapter,
   KycProvider,
-  VerifyBvnInput,
   VerifyBvnResult,
-  VerifyNinInput,
   VerifyNinResult,
 } from '../../adapters/kyc.adapter';
+import { serviceConfigurationError } from 'src/shared/utils';
 
 @Injectable()
 export class FcmbKycProvider implements KycAdapter {
   readonly provider = KycProvider.FCMB;
 
-  verifyBvn(input: VerifyBvnInput): Promise<VerifyBvnResult> {
-    throw new NotImplementedException(
-      `FCMB BVN verification is not wired up yet (bvn=${input.bvn})`,
+  verifyBvn(): Promise<VerifyBvnResult> {
+    throw serviceConfigurationError(
+      'FCMB BVN verification is not wired up yet',
     );
   }
 
-  verifyNin(input: VerifyNinInput): Promise<VerifyNinResult> {
-    throw new NotImplementedException(
-      `FCMB NIN verification is not wired up yet (nin=${input.nin})`,
+  verifyNin(): Promise<VerifyNinResult> {
+    throw serviceConfigurationError(
+      'FCMB NIN verification is not wired up yet',
     );
   }
 
-  bvnImageMatch(input: BvnImageMatchInput): Promise<BvnImageMatchResult> {
-    throw new NotImplementedException(
-      `FCMB BVN image match is not wired up yet (bvn=${input.bvn})`,
-    );
+  bvnImageMatch(): Promise<BvnImageMatchResult> {
+    throw serviceConfigurationError('FCMB BVN image match is not wired up yet');
   }
 }

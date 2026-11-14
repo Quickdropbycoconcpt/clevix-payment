@@ -22,6 +22,7 @@ import {
 } from 'src/shared/enum';
 import * as Crypto from 'node:crypto';
 import { CardPaymentWebhookQueue } from '../jobs/card-payment-webhook.queue';
+import { serviceConfigurationError } from 'src/shared/utils';
 
 type InitiateCardPaymentInput = CardPaymentDto & {
   feeCharged?: string;
@@ -128,7 +129,7 @@ export class CardPaymentService {
       this.collectionAdapterFactory.getCardPaymentAdapter(provider);
 
     if (!adapter.validateOtp) {
-      throw new BadRequestException(
+      throw serviceConfigurationError(
         `${provider} does not support card OTP validation`,
       );
     }

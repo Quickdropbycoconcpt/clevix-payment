@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RedisConfig } from 'src/infrastructure/redis/redis.config';
@@ -29,6 +29,7 @@ import {
   SettlementPayoutAttempts,
   SettlementPayoutAttemptStatus,
 } from '../entity/settlement_payout_attempt.entity';
+import { serviceConfigurationError } from 'src/shared/utils';
 
 @Injectable()
 export class SettlementEngineService {
@@ -211,7 +212,7 @@ export class SettlementEngineService {
     );
 
     if (!bankCode) {
-      throw new BadRequestException(
+      throw serviceConfigurationError(
         `Bank ${input.bankId} is not linked for ${provider}; settlement ${settlementTransaction.settlementTransactionsId} not sent`,
       );
     }

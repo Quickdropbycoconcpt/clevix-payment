@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -11,10 +11,16 @@ import {
   CreateVirtualAccountInput,
   SimulateInwardCreditInput,
 } from 'src/modules/Api/collection/adapters/contracts/virtual-account.adapter';
+import { CollectionProvider } from 'src/modules/Api/collection/adapters/contracts/collection-adapter.types';
 import { RedisConfig } from 'src/infrastructure/redis/redis.config';
 import { RequestEnvironment } from 'src/shared/enum';
 import { MoneyValueConverter } from 'src/shared/converter';
-import { axiosConfig, dobNormalize } from 'src/shared/utils';
+import {
+  axiosConfig,
+  dobNormalize,
+  providerError,
+  providerResponseError,
+} from 'src/shared/utils';
 import * as crypto from 'node:crypto';
 import { TransferQueJobData } from 'src/modules/Api/transfers/job/transfer-queue-job';
 import {
@@ -35,6 +41,7 @@ import {
   CardOtpInput,
   CardOtpResponse,
 } from 'src/modules/Api/collection/card/interface/card.interface';
+import { ErrorCode } from 'src/shared/exceptions/error-codes';
 
 type VfdCreateVirtualAccountResponse = {
   accountNumber: string;
@@ -79,10 +86,11 @@ export class VfdClient {
         raw: response.data,
       };
     } catch (error: any) {
-      this.logger.error(error);
-      throw new BadRequestException(
-        error?.response?.data?.message ?? error.message,
+      throw providerError(
+        CollectionProvider.VFD,
+        'bvnLookup',
         error,
+        ErrorCode.KYC_VERIFICATION_FAILED,
       );
     }
   }
@@ -118,10 +126,11 @@ export class VfdClient {
         raw: response.data,
       };
     } catch (error: any) {
-      this.logger.error(error);
-      throw new BadRequestException(
-        error?.response?.data?.message ?? error.message,
+      throw providerError(
+        CollectionProvider.VFD,
+        'ninLookup',
         error,
+        ErrorCode.KYC_VERIFICATION_FAILED,
       );
     }
   }
@@ -182,8 +191,12 @@ export class VfdClient {
       );
       return response;
     } catch (error: any) {
-      this.logger.error(error);
-      throw new BadRequestException('Invalid request.', error);
+      throw providerError(
+        CollectionProvider.VFD,
+        'simulateInwardCredit',
+        error,
+        ErrorCode.SERVICE_ERROR,
+      );
     }
   }
 
@@ -276,8 +289,12 @@ export class VfdClient {
         currency,
       };
     } catch (error: any) {
-      this.logger.fatal(error.response.data.message);
-      throw new BadRequestException(error.message);
+      throw providerError(
+        CollectionProvider.VFD,
+        'chargePos',
+        error,
+        ErrorCode.PAYMENT_FAILED,
+      );
     }
   }
 
@@ -373,11 +390,12 @@ export class VfdClient {
       );
 
       return response;
-    } catch (error) {
-      this.logger.fatal(error);
-      throw new BadRequestException(
-        'Unable to generate payment account',
+    } catch (error: any) {
+      throw providerError(
+        CollectionProvider.VFD,
+        'createVirtualAccount',
         error,
+        ErrorCode.ACCOUNT_CREATION_FAILED,
       );
     }
   }
@@ -428,8 +446,12 @@ export class VfdClient {
         requiredOtp: cardData?.authType === 'OTP',
       };
     } catch (error: any) {
-      this.logger.error(error?.response?.data ?? error);
-      throw new BadRequestException('Unable to initiate payment');
+      throw providerError(
+        CollectionProvider.VFD,
+        'initiateCardTransaction',
+        error,
+        ErrorCode.PAYMENT_FAILED,
+      );
     }
   }
 
@@ -500,9 +522,11 @@ export class VfdClient {
         message: responseData?.message ?? cardData?.narration,
       };
     } catch (error: any) {
-      this.logger.error(error);
-      throw new BadRequestException(
-        error?.response?.data?.message ?? 'Unable to validate payment OTP',
+      throw providerError(
+        CollectionProvider.VFD,
+        'validateCardOtp',
+        error,
+        ErrorCode.PAYMENT_FAILED,
       );
     }
   }
@@ -528,7 +552,12 @@ export class VfdClient {
         ),
       );
       if (response.data.status != '00') {
-        throw new BadRequestException(response.data.message);
+        throw providerResponseError(
+          CollectionProvider.VFD,
+          'createIndividualStaticAccount',
+          response.data,
+          ErrorCode.ACCOUNT_CREATION_FAILED,
+        );
       }
       return {
         firstName: response.data.data.firstname,
@@ -538,8 +567,12 @@ export class VfdClient {
         accountNumber: response.data.data.accountNo,
       };
     } catch (error: any) {
-      this.logger.error(error);
-      throw new BadRequestException(error.response.data.message, error);
+      throw providerError(
+        CollectionProvider.VFD,
+        'createIndividualStaticAccount',
+        error,
+        ErrorCode.ACCOUNT_CREATION_FAILED,
+      );
     }
   }
 
@@ -579,15 +612,24 @@ export class VfdClient {
       );
 
       if (response.data.status != '00') {
-        throw new BadRequestException(response.data.message);
+        throw providerResponseError(
+          CollectionProvider.VFD,
+          'createCorporateStaticAccount',
+          response.data,
+          ErrorCode.ACCOUNT_CREATION_FAILED,
+        );
       }
       return {
         accountName: response.data.data.accountName,
         accountNumber: response.data.data.accountNo,
       };
     } catch (error: any) {
-      this.logger.error(error.response.data.message);
-      throw new BadRequestException(error.response.data.message, error);
+      throw providerError(
+        CollectionProvider.VFD,
+        'createCorporateStaticAccount',
+        error,
+        ErrorCode.ACCOUNT_CREATION_FAILED,
+      );
     }
   }
 
@@ -648,8 +690,12 @@ export class VfdClient {
         return response?.data?.data?.access_token as string;
       }
     } catch (error: any) {
-      this.logger.error(error.response.data);
-      throw new BadRequestException(error.message);
+      throw providerError(
+        CollectionProvider.VFD,
+        'auth',
+        error,
+        ErrorCode.SERVICE_CONFIGURATION_ERROR,
+      );
     }
   }
 
@@ -664,8 +710,13 @@ export class VfdClient {
         ),
       );
       return response.data.data.bank;
-    } catch (error) {
-      throw new BadRequestException(error.message, error);
+    } catch (error: any) {
+      throw providerError(
+        CollectionProvider.VFD,
+        'bankList',
+        error,
+        ErrorCode.SERVICE_ERROR,
+      );
     }
   }
 
@@ -720,8 +771,12 @@ export class VfdClient {
       );
       return response.data;
     } catch (error: any) {
-      this.logger.error(error);
-      throw new BadRequestException(error.message);
+      throw providerError(
+        CollectionProvider.VFD,
+        'transfer',
+        error,
+        ErrorCode.TRANSFER_FAILED,
+      );
     }
   }
 
@@ -775,12 +830,14 @@ export class VfdClient {
       );
       return response.data;
     } catch (error: any) {
-      if (error.response) {
-        if (error.response.status == 404) {
-          throw new BadRequestException('Receipient details not found');
-        }
-      }
-      throw new BadRequestException(error.message, error);
+      throw providerError(
+        CollectionProvider.VFD,
+        'accountValidation',
+        error,
+        error?.response?.status == 404
+          ? ErrorCode.ACCOUNT_NOT_FOUND
+          : ErrorCode.INVALID_ACCOUNT_NUMBER,
+      );
     }
   }
 
@@ -865,10 +922,11 @@ export class VfdClient {
         raw: response.data,
       };
     } catch (error: any) {
-      this.logger.error(error);
-      throw new BadRequestException(
-        error?.response?.data?.message ?? error.message,
+      throw providerError(
+        CollectionProvider.VFD,
+        'bvnImageMatch',
         error,
+        ErrorCode.KYC_VERIFICATION_FAILED,
       );
     }
   }

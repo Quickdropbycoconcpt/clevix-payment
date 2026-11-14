@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -7,11 +7,12 @@ import {
   DojahFaceMatchResult,
   DojahNinLookupResult,
 } from './interface/dojah.interface';
+import { KycProvider } from '../../adapters/kyc.adapter';
+import { ErrorCode } from 'src/shared/exceptions/error-codes';
+import { providerError } from 'src/shared/utils';
 
 @Injectable()
 export class DojahApiClient {
-  private readonly logger = new Logger(DojahApiClient.name);
-
   constructor(private readonly httpService: HttpService) {}
 
   async bvnLookup(bvn: string): Promise<DojahBvnLookupResult> {
@@ -34,11 +35,12 @@ export class DojahApiClient {
         phoneNumber: entity.phone_number1 || undefined,
         raw: response.data,
       };
-    } catch (error: any) {
-      this.logProviderError('bvnLookup', error);
-      throw new BadRequestException(
-        error?.response?.data?.error ?? error.message,
+    } catch (error: unknown) {
+      throw providerError(
+        KycProvider.DOJAH,
+        'bvnLookup',
         error,
+        ErrorCode.KYC_VERIFICATION_FAILED,
       );
     }
   }
@@ -64,11 +66,12 @@ export class DojahApiClient {
         phoneNumber: entity.phone_number1 || undefined,
         address: entity.residence_address || undefined,
       };
-    } catch (error: any) {
-      this.logProviderError('ninLookup', error);
-      throw new BadRequestException(
-        error?.response?.data?.error ?? error.message,
+    } catch (error: unknown) {
+      throw providerError(
+        KycProvider.DOJAH,
+        'ninLookup',
         error,
+        ErrorCode.KYC_VERIFICATION_FAILED,
       );
     }
   }
@@ -102,21 +105,14 @@ export class DojahApiClient {
         match: selfieVerification.match ?? false,
         confidence: selfieVerification.confidence_value,
       };
-    } catch (error: any) {
-      this.logProviderError('identityWithFaceMatch', error);
-      throw new BadRequestException(
-        error?.response?.data?.error ?? error.message,
+    } catch (error: unknown) {
+      throw providerError(
+        KycProvider.DOJAH,
+        'identityWithFaceMatch',
         error,
+        ErrorCode.KYC_VERIFICATION_FAILED,
       );
     }
-  }
-
-  private logProviderError(operation: string, error: any) {
-    this.logger.error(
-      `Dojah ${operation} failed status=${error?.response?.status ?? 'none'} response=${JSON.stringify(
-        error?.response?.data ?? { message: error?.message },
-      )}`,
-    );
   }
 
   private get baseUrl(): string {

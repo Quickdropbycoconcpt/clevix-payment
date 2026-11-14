@@ -10,6 +10,7 @@ import {
 import { Repository } from 'typeorm';
 import { BusinessFeeConfiguration } from '../entity/business_fee_config.entity';
 import { PlatformFeeConfiguration } from '../entity/platformFee_config.entity';
+import { serviceConfigurationError } from 'src/shared/utils';
 
 type FeeAmount = IntegerAmount;
 type FeeCalculationInput = {
@@ -57,7 +58,7 @@ export class FeeConfigurationService {
     });
 
     if (!platformConfig) {
-      throw new BadRequestException(
+      throw serviceConfigurationError(
         `Platform fee not setup for ${normalizedProvider}`,
       );
     }

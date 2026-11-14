@@ -1,10 +1,21 @@
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import { MoneyValueConverter } from './converter';
-import { AxiosRequestConfig } from 'axios';
+import { AxiosRequestConfig, isAxiosError } from 'axios';
 import { RequestEnvironment } from './enum';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { randomInt } from 'crypto';
 import { POSTGRES_BIGINT_MAX } from './validators/is-bigint-amount-string.validator';
+import { AppException } from './exceptions/app.exception';
+import { ErrorCode } from './exceptions/error-codes';
+import {
+  ProviderErrorContext,
+  ProviderException,
+} from './exceptions/provider.exception';
 
 export type IntegerAmount = string | number | bigint;
 export type DecimalValue = string | number;
@@ -315,4 +326,116 @@ export function dobNormalize(dob: string): string {
   }
 
   return `${day}-${monthName}-${year}`;
+}
+
+type ProviderResponseBody =
+  | {
+      status?: string;
+      code?: string;
+      responseCode?: string;
+      message?: string;
+      responseMessage?: string;
+      error?: string;
+    }
+  | undefined;
+
+const providerErrorLogger = new Logger('ProviderError');
+
+export function providerError(
+  provider: string,
+  operation: string,
+  error: unknown,
+  fallback: ErrorCode,
+): HttpException {
+  if (error instanceof HttpException) {
+    return error;
+  }
+
+  const axiosError = isAxiosError<ProviderResponseBody>(error)
+    ? error
+    : undefined;
+  const providerHttpStatus = axiosError?.response?.status;
+  const data = axiosError?.response?.data;
+  const errorMessage = error instanceof Error ? error.message : undefined;
+
+  return buildProviderException(
+    {
+      provider,
+      operation,
+      providerHttpStatus,
+      providerCode: providerCodeFrom(data),
+      providerMessage: providerMessageFrom(data) ?? errorMessage,
+    },
+    resolveProviderErrorCode(error, providerHttpStatus, fallback),
+    data ?? { message: errorMessage },
+  );
+}
+
+export function providerResponseError(
+  provider: string,
+  operation: string,
+  data: ProviderResponseBody,
+  errorCode: ErrorCode,
+): ProviderException {
+  return buildProviderException(
+    {
+      provider,
+      operation,
+      providerCode: providerCodeFrom(data),
+      providerMessage: providerMessageFrom(data),
+    },
+    errorCode,
+    data,
+  );
+}
+
+function providerCodeFrom(data: ProviderResponseBody): string | undefined {
+  return data?.responseCode ?? data?.status ?? data?.code;
+}
+
+function providerMessageFrom(data: ProviderResponseBody): string | undefined {
+  return data?.responseMessage ?? data?.message ?? data?.error;
+}
+
+function buildProviderException(
+  context: ProviderErrorContext,
+  errorCode: ErrorCode,
+  logged: unknown,
+): ProviderException {
+  providerErrorLogger.error(
+    `${context.provider} ${context.operation} failed errorCode=${errorCode} status=${
+      context.providerHttpStatus ?? 'none'
+    } response=${JSON.stringify(logged ?? {})}`,
+  );
+
+  return new ProviderException(errorCode, context);
+}
+
+function resolveProviderErrorCode(
+  error: unknown,
+  providerHttpStatus: number | undefined,
+  fallback: ErrorCode,
+): ErrorCode {
+  if (isAxiosError(error) && !error.response) {
+    return ErrorCode.SERVICE_UNAVAILABLE;
+  }
+
+  if (providerHttpStatus === 401 || providerHttpStatus === 403) {
+    return ErrorCode.SERVICE_CONFIGURATION_ERROR;
+  }
+
+  if (providerHttpStatus >= 500) {
+    return ErrorCode.SERVICE_UNAVAILABLE;
+  }
+
+  return fallback;
+}
+
+export function serviceConfigurationError(detail: string): AppException {
+  providerErrorLogger.error(`Service configuration error: ${detail}`);
+
+  return new AppException(
+    ErrorCode.SERVICE_CONFIGURATION_ERROR,
+    HttpStatus.BAD_REQUEST,
+  );
 }

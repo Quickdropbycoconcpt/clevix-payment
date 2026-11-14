@@ -1,9 +1,13 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { RedisConfig } from 'src/infrastructure/redis/redis.config';
 import { RequestEnvironment } from 'src/shared/enum';
 import { base64Encoded } from 'src/shared/encryption';
+import { CollectionProvider } from 'src/modules/Api/collection/adapters/contracts/collection-adapter.types';
+import { AppException } from 'src/shared/exceptions/app.exception';
+import { ErrorCode } from 'src/shared/exceptions/error-codes';
+import { providerError, providerResponseError } from 'src/shared/utils';
 
 type MonnifyResponse<T> = {
   requestSuccessful: boolean;
@@ -39,7 +43,6 @@ const CARD_SESSION_TTL_SECONDS = 15 * 60;
 
 @Injectable()
 export class MonnifyClient {
-  private readonly logger = new Logger(MonnifyClient.name);
   private readonly AUTH_CACHE_KEY = 'monnify_access_token';
   private readonly CARD_SESSION_KEY = 'monnify_card_session';
   private readonly redis = new RedisConfig();
@@ -72,12 +75,18 @@ export class MonnifyClient {
         getAllAvailableBanks: true,
       },
       'createReservedAccount',
+      ErrorCode.ACCOUNT_CREATION_FAILED,
     );
 
     const account = body.accounts?.[0];
 
     if (!account) {
-      throw new BadRequestException('Monnify returned no reserved account');
+      throw providerResponseError(
+        CollectionProvider.MONNIFY,
+        'createReservedAccount',
+        { message: 'No reserved account returned' },
+        ErrorCode.ACCOUNT_CREATION_FAILED,
+      );
     }
 
     return account;
@@ -109,6 +118,7 @@ export class MonnifyClient {
         paymentMethods: input.paymentMethods,
       },
       'initTransaction',
+      ErrorCode.PAYMENT_FAILED,
     );
   }
 
@@ -122,6 +132,7 @@ export class MonnifyClient {
       '/api/v1/merchant/bank-transfer/init-payment',
       { transactionReference },
       'initBankTransferPayment',
+      ErrorCode.PAYMENT_FAILED,
     );
   }
 
@@ -151,6 +162,7 @@ export class MonnifyClient {
         },
       },
       'chargeCard',
+      ErrorCode.PAYMENT_FAILED,
     );
 
     if (charge.otpData?.id) {
@@ -176,8 +188,9 @@ export class MonnifyClient {
     const session = await this.redis.retrieveData(sessionKey);
 
     if (!session) {
-      throw new BadRequestException(
-        'Card session not found or expired. Initiate the payment again',
+      throw new AppException(
+        ErrorCode.PAYMENT_SESSION_EXPIRED,
+        HttpStatus.BAD_REQUEST,
       );
     }
 
@@ -194,6 +207,7 @@ export class MonnifyClient {
         token: input.otp,
       },
       'authorizeCardOtp',
+      ErrorCode.PAYMENT_FAILED,
     );
 
     await this.redis.deleteData(sessionKey);
@@ -226,6 +240,7 @@ export class MonnifyClient {
         sourceAccountNumber: credentials.walletAccountNumber,
       },
       'singleTransfer',
+      ErrorCode.TRANSFER_FAILED,
     );
   }
 
@@ -239,6 +254,7 @@ export class MonnifyClient {
       `/api/v2/disbursements/single/summary?reference=${encodeURIComponent(reference)}`,
       undefined,
       'transferStatus',
+      ErrorCode.SERVICE_ERROR,
     );
   }
 
@@ -252,6 +268,7 @@ export class MonnifyClient {
       `/api/v2/disbursements/wallet-balance?accountNumber=${encodeURIComponent(accountNumber)}`,
       undefined,
       'walletBalance',
+      ErrorCode.SERVICE_ERROR,
     );
   }
 
@@ -262,6 +279,7 @@ export class MonnifyClient {
       '/api/v1/banks',
       undefined,
       'bankList',
+      ErrorCode.SERVICE_ERROR,
     );
   }
 
@@ -278,6 +296,7 @@ export class MonnifyClient {
       )}&bankCode=${encodeURIComponent(bankCode)}`,
       undefined,
       'validateAccount',
+      ErrorCode.INVALID_ACCOUNT_NUMBER,
     );
   }
 
@@ -287,6 +306,7 @@ export class MonnifyClient {
     path: string,
     payload: unknown,
     operation: string,
+    fallback: ErrorCode,
   ): Promise<T> {
     const { baseUrl } = this.credentialPicker(environment);
 
@@ -312,23 +332,21 @@ export class MonnifyClient {
       });
 
       if (!response.data?.requestSuccessful) {
-        this.logProviderError(operation, {
-          response: { status: response.status, data: response.data },
-        });
-        throw new BadRequestException(
-          response.data?.responseMessage ?? `Monnify ${operation} failed`,
+        throw providerResponseError(
+          CollectionProvider.MONNIFY,
+          operation,
+          response.data,
+          fallback,
         );
       }
 
       return response.data.responseBody;
-    } catch (error: any) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-
-      this.logProviderError(operation, error);
-      throw new BadRequestException(
-        error?.response?.data?.responseMessage ?? `Monnify ${operation} failed`,
+    } catch (error: unknown) {
+      throw providerError(
+        CollectionProvider.MONNIFY,
+        operation,
+        error,
+        fallback,
       );
     }
   }
@@ -386,9 +404,13 @@ export class MonnifyClient {
       );
 
       return accessToken;
-    } catch (error: any) {
-      this.logProviderError('login', error);
-      throw new BadRequestException('Unable to authenticate with Monnify');
+    } catch (error: unknown) {
+      throw providerError(
+        CollectionProvider.MONNIFY,
+        'login',
+        error,
+        ErrorCode.SERVICE_CONFIGURATION_ERROR,
+      );
     }
   }
 
@@ -412,13 +434,5 @@ export class MonnifyClient {
         ? process.env.MONNIFY_DEV_WALLET_ACCOUNT_NUMBER
         : process.env.MONNIFY_LIVE_WALLET_ACCOUNT_NUMBER,
     };
-  }
-
-  private logProviderError(operation: string, error: any) {
-    this.logger.error(
-      `Monnify ${operation} failed status=${error?.response?.status ?? 'none'} response=${JSON.stringify(
-        error?.response?.data ?? { message: error?.message },
-      )}`,
-    );
   }
 }

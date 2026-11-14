@@ -1,12 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
 import { ProviderServiceType } from 'src/shared/enum';
 import { Providers } from '../entity/providers.entity';
+import { serviceConfigurationError } from 'src/shared/utils';
 
 @Injectable()
 export class ProviderService {
@@ -60,7 +57,7 @@ export class ProviderService {
     const provider = await this.getProvider(value, serviceType);
 
     if (!provider.isActive) {
-      throw new BadRequestException(
+      throw serviceConfigurationError(
         `Provider ${provider.name} is not active for ${serviceType}`,
       );
     }
