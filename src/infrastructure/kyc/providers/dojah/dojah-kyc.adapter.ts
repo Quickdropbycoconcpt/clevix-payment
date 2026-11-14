@@ -46,9 +46,7 @@ export class DojahKycProvider implements KycAdapter {
     };
   }
 
-  async bvnImageMatch(
-    input: BvnImageMatchInput,
-  ): Promise<BvnImageMatchResult> {
+  async bvnImageMatch(input: BvnImageMatchInput): Promise<BvnImageMatchResult> {
     const result = await this.dojahClient.identityWithFaceMatch({
       bvn: input.bvn,
       selfieImageBase64: input.base64Image,
@@ -58,6 +56,12 @@ export class DojahKycProvider implements KycAdapter {
       bvn: result.bvn,
       match: result.match,
       confidence: result.confidence,
+      firstName: result.firstName,
+      address: '',
+      lastName: result.lastName,
+      middleName: result.middleName,
+      dateOfBirth: result.dateOfBirth,
+      phoneNumber: result.phoneNumber,
     };
   }
 }
