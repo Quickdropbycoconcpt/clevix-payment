@@ -2,11 +2,13 @@ import { DataSource } from 'typeorm';
 import AppDataSource from '../database/typeorm.data-source';
 import { Providers } from '../../modules/Api/providers/entity/providers.entity';
 import { CollectionProvider } from '../../modules/Api/collection/adapters/contracts/collection-adapter.types';
+import { KycProvider } from '../kyc/adapters/kyc.adapter';
 import { ProviderServiceType } from '../../shared/enum';
 
 const FCMB = { name: 'FCMB', value: CollectionProvider.FCMB };
 const VFD = { name: 'VFD', value: CollectionProvider.VFD };
 const MONNIFY = { name: 'Monnify', value: CollectionProvider.MONNIFY };
+const DOJAH = { name: 'Dojah', value: KycProvider.DOJAH };
 
 export const providersSeed = [
   { ...VFD, serviceType: ProviderServiceType.TRANSFER, isActive: false },
@@ -26,6 +28,9 @@ export const providersSeed = [
 
   { ...VFD, serviceType: ProviderServiceType.POS, isActive: true },
   { ...FCMB, serviceType: ProviderServiceType.POS, isActive: false },
+
+  { ...DOJAH, serviceType: ProviderServiceType.KYC, isActive: true },
+  { ...VFD, serviceType: ProviderServiceType.KYC, isActive: false },
 ];
 
 export async function seedProviders(

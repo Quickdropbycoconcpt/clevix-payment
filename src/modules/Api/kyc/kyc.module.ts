@@ -7,8 +7,10 @@ import { VfdKycProvider } from 'src/infrastructure/kyc/providers/vfd/vfd-kyc.ada
 import { KycController } from './controller/kyc.controllers';
 import { KycService } from './service/kyc.service';
 import { VfdClient } from 'src/infrastructure/payments/providers/vfd/vfd.client';
+import { ProvidersManagementModule } from '../providers/providers.management.module';
 
 @Module({
+  imports: [ProvidersManagementModule],
   controllers: [KycController],
   providers: [
     KycAdapterFactory,

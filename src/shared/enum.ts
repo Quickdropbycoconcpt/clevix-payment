@@ -103,6 +103,7 @@ export enum ProviderServiceType {
   VIRTUAL_ACCOUNT = 'VIRTUAL_ACCOUNT',
   CARD = 'CARD',
   POS = 'POS',
+  KYC = 'KYC',
 }
 
 export enum JobQueueList {
