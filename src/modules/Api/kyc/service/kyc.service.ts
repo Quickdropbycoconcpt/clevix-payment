@@ -48,7 +48,7 @@ export class KycService {
     scope: RequestScope,
   ): Promise<BvnImageMatchResult> {
     const businessScope = getBusinessScope(scope);
-    const provider = KycProvider.VFD;
+    const provider = KycProvider.DOJAH;
     const adapter = this.kycAdapterFactory.getKycAdapter(provider);
 
     return adapter.bvnImageMatch({
