@@ -47,11 +47,11 @@ export type BvnImageMatchInput = {
 export type BvnImageMatchResult = {
   bvn: string;
   match: boolean;
-  firstName: string;
-  address: string;
-  lastName: string;
+  firstName?: string;
+  address?: string;
+  lastName?: string;
   middleName?: string;
-  dateOfBirth: string;
+  dateOfBirth?: string;
   phoneNumber?: string;
   confidence?: number;
 };
