@@ -26,6 +26,7 @@ export class MonnifyTransferProvider implements TransferAdapter {
       narration: input.narration,
       destinationBankCode: input.bankCode,
       destinationAccountNumber: input.accountNumber,
+      destinationAccountName: input.accountName,
       sourceAccountNumber: input.senderAccount,
     });
   }

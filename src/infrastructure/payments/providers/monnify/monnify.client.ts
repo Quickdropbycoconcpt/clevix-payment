@@ -222,6 +222,7 @@ export class MonnifyClient {
     narration: string;
     destinationBankCode: string;
     destinationAccountNumber: string;
+    destinationAccountName: string;
     sourceAccountNumber?: string;
   }): Promise<{ status: string; reference: string }> {
     const credentials = this.credentialPicker(input.environment);
@@ -236,6 +237,7 @@ export class MonnifyClient {
         narration: input.narration,
         destinationBankCode: input.destinationBankCode,
         destinationAccountNumber: input.destinationAccountNumber,
+        destinationAccountName: input.destinationAccountName,
         currency: 'NGN',
         sourceAccountNumber: credentials.walletAccountNumber,
       },
