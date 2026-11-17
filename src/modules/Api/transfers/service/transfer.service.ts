@@ -17,6 +17,7 @@ import { AddTransferIntoQue } from '../job/transfer-queue-job';
 import { TransferAdapterFactory } from '../adapters/transfer.adapter.factory';
 import { WalletTransactions } from 'src/modules/wallets/entity/wallet_transactions.entity';
 import { ProviderService } from 'src/modules/Api/providers/service/providers.service';
+import { BanksService } from 'src/modules/Api/banks/service/banks.service';
 
 @Injectable()
 export class TransferService {
@@ -27,6 +28,7 @@ export class TransferService {
     private readonly transferQueue: AddTransferIntoQue,
     private readonly transferAdapterFactory: TransferAdapterFactory,
     private readonly providerService: ProviderService,
+    private readonly banksService: BanksService,
     @InjectRepository(WalletTransactions)
     private readonly walletTransactionRepo: Repository<WalletTransactions>,
   ) {}
@@ -47,6 +49,10 @@ export class TransferService {
       await this.providerService.getActiveProviderForService(
         ProviderServiceType.TRANSFER,
       );
+    const providerBankCode = await this.banksService.resolveProviderBankCode(
+      bankCode,
+      provider,
+    );
     const walletTransaction = await this.walletService.debitUserWallet({
       amount,
       environment,
@@ -63,7 +69,7 @@ export class TransferService {
       accountName,
       accountNumber,
       narration,
-      bankCode,
+      bankCode: providerBankCode,
       environment,
       currency,
       senderAccount,

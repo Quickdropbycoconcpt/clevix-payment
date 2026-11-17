@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
@@ -15,6 +16,8 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { ValidateAccountDto } from '../dto/banks.dto';
 import { ProviderService } from 'src/modules/Api/providers/service/providers.service';
 import { ProviderServiceType } from 'src/shared/enum';
+import { AppException } from 'src/shared/exceptions/app.exception';
+import { ErrorCode } from 'src/shared/exceptions/error-codes';
 
 @Injectable()
 export class BanksService {
@@ -180,20 +183,60 @@ export class BanksService {
   }
 
   async validateBankAccount(body: ValidateAccountDto) {
-    const adapter = this.banksAdapterFactory.getBankAdapter(
-      await this.getTransferProvider(),
+    const provider = await this.getTransferProvider();
+    const bankCode = await this.resolveProviderBankCode(
+      body.bankCode,
+      provider,
     );
+    const adapter = this.banksAdapterFactory.getBankAdapter(provider);
     try {
-      return await adapter.validateAccountNumber(
-        body.accountNumber,
-        body.bankCode,
-      );
+      return await adapter.validateAccountNumber(body.accountNumber, bankCode);
     } catch (error) {
       this.logger.error(error);
       throw new BadRequestException(
         `We can't complete the request at the moment`,
       );
     }
+  }
+
+  async resolveProviderBankCode(
+    bankCode: string,
+    provider: string,
+  ): Promise<string> {
+    const code = bankCode?.trim();
+    const rows = await this.providerBankRepo.find({
+      where: { bankCode: code, bankId: Not(IsNull()) },
+    });
+
+    if (rows.some((row) => row.provider === provider)) {
+      return code;
+    }
+
+    const bankIds = new Set(rows.map((row) => row.bankId));
+
+    if (bankIds.size !== 1) {
+      if (bankIds.size > 1) {
+        this.logger.warn(
+          `Bank code ${code} matches ${bankIds.size} different banks across providers; rejected`,
+        );
+      }
+      throw new AppException(
+        ErrorCode.UNSUPPORTED_BANK,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const [bankId] = bankIds;
+    const providerBankCode = await this.getProviderBankCode(bankId, provider);
+
+    if (!providerBankCode) {
+      throw new AppException(
+        ErrorCode.UNSUPPORTED_BANK,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    return providerBankCode;
   }
 
   async getProviderBankCode(
