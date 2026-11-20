@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { isAxiosError } from 'axios';
 import {
   ChargePosInput,
   ChargePosResult,
@@ -50,12 +51,22 @@ type VfdCreateVirtualAccountResponse = {
   bankName: string;
 };
 
+type IndividualStaticAccountResult = {
+  accountNumber: string;
+  accountName?: string;
+  firstName?: string;
+  lastName?: string;
+  middleName?: string;
+  currentTier?: string;
+};
+
 @Injectable()
 export class VfdClient {
   constructor(private readonly httpService: HttpService) {}
   private readonly serviceName = VfdClient.name;
   private readonly logger = new Logger(VfdClient.name);
   private readonly AUTH_CACHE_KEY = 'vfd_access_token';
+  private readonly ACCOUNT_CREATION_TIMEOUT = 60000;
   private readonly redis = new RedisConfig();
 
   async bvnLookup(input: { bvn: string; environment: string }): Promise<{
@@ -155,6 +166,7 @@ export class VfdClient {
       lastName: response.lastName,
       currentTier: response.currentTier,
       middleName: response.middleName,
+      accountName: response.accountName,
       bankName: 'VFD MFB',
     };
   }
@@ -531,9 +543,59 @@ export class VfdClient {
     }
   }
 
+  private isExistingClientResponse(
+    data: any,
+  ): data is { data: { accountNo: string } } {
+    return (
+      typeof data?.message === 'string' &&
+      data.message.trim().toLowerCase() === 'client account exists' &&
+      typeof data?.data?.accountNo === 'string' &&
+      data.data.accountNo.trim() !== ''
+    );
+  }
+
+  private async recoverExistingCorporateAccount(
+    body: CreateCorporateStaticAccount,
+    accountNo: string,
+  ): Promise<{ accountNumber: string; accountName: string }> {
+    const account = await this.recoverExistingStaticAccount(
+      body.environment,
+      accountNo,
+      'createCorporateStaticAccount',
+    );
+
+    return {
+      accountNumber: account.accountNumber,
+      accountName: body.companyName,
+    };
+  }
+
+  private async recoverExistingStaticAccount(
+    environment: string,
+    accountNo: string,
+    operation = 'createIndividualStaticAccount',
+  ): Promise<IndividualStaticAccountResult> {
+    const account = await this.vfdsenderaccountEnquiry(environment, accountNo);
+
+    if (!account?.accountNo) {
+      throw providerResponseError(
+        CollectionProvider.VFD,
+        operation,
+        { message: `Enquiry returned no account for ${accountNo}` },
+        ErrorCode.ACCOUNT_CREATION_FAILED,
+      );
+    }
+
+    this.logger.warn(
+      `VFD ${operation} recovered existing account accountNo=${account.accountNo}`,
+    );
+
+    return { accountNumber: account.accountNo, accountName: account.client };
+  }
+
   private async individualStaticAccountCreation(
     body: CreateIndividualStaticAccount,
-  ) {
+  ): Promise<IndividualStaticAccountResult> {
     try {
       const queryParams = new URLSearchParams();
       const credentials = this.credentialPicker(body.environment);
@@ -547,10 +609,16 @@ export class VfdClient {
           this.httpService.post(
             `${credentials.walletUrl}/client/tiers/individual?${queryParams.toString()}`,
             {},
-            axiosConfig(body.environment, token),
+            axiosConfig(body.environment, token, this.ACCOUNT_CREATION_TIMEOUT),
           ),
         ),
       );
+      if (this.isExistingClientResponse(response.data)) {
+        return await this.recoverExistingStaticAccount(
+          body.environment,
+          response.data.data.accountNo,
+        );
+      }
       if (response.data.status != '00') {
         throw providerResponseError(
           CollectionProvider.VFD,
@@ -567,6 +635,13 @@ export class VfdClient {
         accountNumber: response.data.data.accountNo,
       };
     } catch (error: any) {
+      const errorData = isAxiosError(error) ? error.response?.data : undefined;
+      if (this.isExistingClientResponse(errorData)) {
+        return await this.recoverExistingStaticAccount(
+          body.environment,
+          errorData.data.accountNo,
+        );
+      }
       throw providerError(
         CollectionProvider.VFD,
         'createIndividualStaticAccount',
@@ -606,11 +681,17 @@ export class VfdClient {
               businessType,
               state,
             },
-            { headers: { AccessToken: token } },
+            axiosConfig(body.environment, token, this.ACCOUNT_CREATION_TIMEOUT),
           ),
         ),
       );
 
+      if (this.isExistingClientResponse(response.data)) {
+        return await this.recoverExistingCorporateAccount(
+          body,
+          response.data.data.accountNo,
+        );
+      }
       if (response.data.status != '00') {
         throw providerResponseError(
           CollectionProvider.VFD,
@@ -624,6 +705,13 @@ export class VfdClient {
         accountNumber: response.data.data.accountNo,
       };
     } catch (error: any) {
+      const errorData = isAxiosError(error) ? error.response?.data : undefined;
+      if (this.isExistingClientResponse(errorData)) {
+        return await this.recoverExistingCorporateAccount(
+          body,
+          errorData.data.accountNo,
+        );
+      }
       throw providerError(
         CollectionProvider.VFD,
         'createCorporateStaticAccount',

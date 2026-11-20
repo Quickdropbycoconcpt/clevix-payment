@@ -140,9 +140,10 @@ export const fromNairaToKoboAmount = (
 export function axiosConfig(
   merchantEnvironment: string,
   token: string,
+  timeout = 25000,
 ): AxiosRequestConfig {
   const axiosConfig: AxiosRequestConfig = {
-    timeout: 25000,
+    timeout,
     headers: { AccessToken: token },
   };
 

@@ -48,8 +48,8 @@ export class VfdVirtualAccountProvider implements VirtualAccountAdapter {
       accountNumber: response.accountNumber,
       middleName: response.middleName,
       bankName: response.bankName,
-      firstName: response.firstName,
-      lastname: response.lastName,
+      firstName: response.firstName ?? input.firstName,
+      lastname: response.lastName ?? input.lastName,
       currentTier: response.currentTier,
     };
   }
