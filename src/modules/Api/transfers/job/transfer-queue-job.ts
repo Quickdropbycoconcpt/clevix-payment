@@ -50,4 +50,22 @@ export class AddTransferIntoQue {
       `Queued transfer payout reference=${input.reference} provider=${input.provider}`,
     );
   }
+
+  async isQueued(reference: string): Promise<boolean> {
+    const job = await this.transferQueue.getJob(reference);
+
+    if (!job) {
+      return false;
+    }
+
+    const state = await job.getState();
+
+    return [
+      'waiting',
+      'delayed',
+      'active',
+      'prioritized',
+      'waiting-children',
+    ].includes(state);
+  }
 }

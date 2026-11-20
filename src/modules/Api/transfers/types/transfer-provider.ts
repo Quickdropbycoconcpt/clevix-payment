@@ -27,6 +27,7 @@ export enum TransferStatusResult {
   SUCCESS = 'SUCCESS',
   PENDING = 'PENDING',
   FAILED = 'FAILED',
+  NOT_FOUND = 'NOT_FOUND',
 }
 
 export type TransactionQueryStatus = {

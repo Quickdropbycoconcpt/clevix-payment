@@ -1,8 +1,14 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, LessThanOrEqual, Repository } from 'typeorm';
 import { TransferStatusResult } from '../types/transfer-provider';
+import {
+  nextStatusCheckAt,
+  NOT_FOUND_FAIL_AFTER_MS,
+  STATUS_CHECK_BATCH_SIZE,
+  STUCK_PENDING_AFTER_MS,
+} from '../types/transfer-status-check';
 import { WalletService } from 'src/modules/wallets/service/wallets.service';
 import { WithdrawalDto } from '../dto/transfer.dto';
 import { getBusinessScope, RequestScope } from 'src/shared/business-scope';
@@ -22,6 +28,8 @@ import { BanksService } from 'src/modules/Api/banks/service/banks.service';
 @Injectable()
 export class TransferService {
   private readonly logger = new Logger(TransferService.name);
+  private isCheckingProcessing = false;
+  private isCheckingPending = false;
 
   constructor(
     private readonly walletService: WalletService,
@@ -104,54 +112,274 @@ export class TransferService {
     };
   }
 
-  @Cron('*/3 * * * *')
+  @Cron('*/5 * * * * *')
   async validateOutgoingTransferStatus() {
+    if (this.isCheckingProcessing) {
+      return;
+    }
+
+    this.isCheckingProcessing = true;
+
     try {
       const processingTransfers = await this.walletTransactionRepo.find({
-        where: {
-          status: WalletTransactionStatus.PROCESSING,
-          source: WalletTransactionSource.PAYOUT,
-          environment: RequestEnvironment.LIVE,
-        },
-        order: { createdAt: 'ASC' },
-        take: 200,
+        where: [
+          {
+            status: WalletTransactionStatus.PROCESSING,
+            source: WalletTransactionSource.PAYOUT,
+            environment: RequestEnvironment.LIVE,
+            nextStatusCheckAt: LessThanOrEqual(new Date()),
+          },
+          {
+            status: WalletTransactionStatus.PROCESSING,
+            source: WalletTransactionSource.PAYOUT,
+            environment: RequestEnvironment.LIVE,
+            nextStatusCheckAt: IsNull(),
+          },
+        ],
+        order: { nextStatusCheckAt: { direction: 'ASC', nulls: 'FIRST' } },
+        take: STATUS_CHECK_BATCH_SIZE,
       });
 
-      if (processingTransfers.length === 0) {
-        return;
-      }
-
       await Promise.allSettled(
-        processingTransfers.map(async (transfer) => {
-          const adapter = this.transferAdapterFactory.getTransferdapter(
-            transfer.provider,
-          );
-          const result = await adapter.transactionStatusQuery({
-            environment: transfer.environment,
-            reference: transfer.reference,
-          });
-          console.log(result);
-          if (result.status === TransferStatusResult.PENDING) {
-            return;
-          }
-
-          await this.walletTransactionRepo.update(
-            { walletTransactionId: transfer.walletTransactionId },
-            {
-              status:
-                result.status === TransferStatusResult.SUCCESS
-                  ? WalletTransactionStatus.COMPLETED
-                  : WalletTransactionStatus.FAILED,
-              providerReference: result.sessionId ?? transfer.providerReference,
-            },
-          );
-        }),
+        processingTransfers.map((transfer) =>
+          this.settleProcessingTransfer(transfer),
+        ),
       );
     } catch (error) {
       this.logger.error(
         'Failed to validate outgoing transfer status',
         error instanceof Error ? error.stack : String(error),
       );
+    } finally {
+      this.isCheckingProcessing = false;
     }
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async checkStuckPendingTransfers() {
+    if (this.isCheckingPending) {
+      return;
+    }
+
+    this.isCheckingPending = true;
+
+    try {
+      const now = new Date();
+      const pendingTransfers = await this.walletTransactionRepo.find({
+        where: [
+          {
+            status: WalletTransactionStatus.PENDING,
+            source: WalletTransactionSource.PAYOUT,
+            environment: RequestEnvironment.LIVE,
+            createdAt: LessThanOrEqual(
+              new Date(now.getTime() - STUCK_PENDING_AFTER_MS),
+            ),
+            nextStatusCheckAt: LessThanOrEqual(now),
+          },
+          {
+            status: WalletTransactionStatus.PENDING,
+            source: WalletTransactionSource.PAYOUT,
+            environment: RequestEnvironment.LIVE,
+            createdAt: LessThanOrEqual(
+              new Date(now.getTime() - STUCK_PENDING_AFTER_MS),
+            ),
+            nextStatusCheckAt: IsNull(),
+          },
+        ],
+        order: { createdAt: 'ASC' },
+        take: STATUS_CHECK_BATCH_SIZE,
+      });
+
+      for (const transfer of pendingTransfers) {
+        await this.checkStuckPendingTransfer(transfer);
+      }
+    } catch (error) {
+      this.logger.error(
+        'Failed to check stuck pending transfers',
+        error instanceof Error ? error.stack : String(error),
+      );
+    } finally {
+      this.isCheckingPending = false;
+    }
+  }
+
+  private async settleProcessingTransfer(transfer: WalletTransactions) {
+    const result = await this.queryTransferStatus(transfer);
+
+    if (
+      result.status === TransferStatusResult.SUCCESS ||
+      result.status === TransferStatusResult.FAILED
+    ) {
+      const settled = await this.walletTransactionRepo.update(
+        {
+          walletTransactionId: transfer.walletTransactionId,
+          status: WalletTransactionStatus.PROCESSING,
+        },
+        {
+          status:
+            result.status === TransferStatusResult.SUCCESS
+              ? WalletTransactionStatus.COMPLETED
+              : WalletTransactionStatus.FAILED,
+          providerReference: result.sessionId ?? transfer.providerReference,
+          nextStatusCheckAt: null,
+          statusCheckAttempts: transfer.statusCheckAttempts + 1,
+          ...(result.status === TransferStatusResult.FAILED
+            ? {
+                message:
+                  `Provider status ${result.providerStatus ?? ''}`.trim(),
+              }
+            : {}),
+        },
+      );
+
+      if (settled.affected === 1) {
+        this.logger.log(
+          `Settled transfer reference=${transfer.reference} status=${result.status} providerStatus=${result.providerStatus}`,
+        );
+      }
+      return;
+    }
+
+    if (result.status === TransferStatusResult.NOT_FOUND) {
+      const now = new Date();
+
+      if (this.notFoundLongEnough(transfer)) {
+        const failed = await this.walletTransactionRepo.update(
+          {
+            walletTransactionId: transfer.walletTransactionId,
+            status: WalletTransactionStatus.PROCESSING,
+          },
+          {
+            status: WalletTransactionStatus.FAILED,
+            message: 'Transfer not found at provider',
+            nextStatusCheckAt: null,
+            statusCheckAttempts: transfer.statusCheckAttempts + 1,
+          },
+        );
+
+        if (failed.affected === 1) {
+          this.logger.warn(
+            `Failed transfer reference=${transfer.reference}: provider has no record since ${new Date(transfer.firstNotFoundAt).toISOString()}`,
+          );
+        }
+        return;
+      }
+
+      await this.scheduleNextStatusCheck(
+        transfer,
+        WalletTransactionStatus.PROCESSING,
+        { firstNotFoundAt: transfer.firstNotFoundAt ?? now },
+      );
+      return;
+    }
+
+    await this.scheduleNextStatusCheck(
+      transfer,
+      WalletTransactionStatus.PROCESSING,
+      result.providerStatus ? { firstNotFoundAt: null } : {},
+    );
+  }
+
+  private async checkStuckPendingTransfer(transfer: WalletTransactions) {
+    if (await this.transferQueue.isQueued(transfer.reference)) {
+      return;
+    }
+
+    const result = await this.queryTransferStatus(transfer);
+
+    if (result.status === TransferStatusResult.NOT_FOUND) {
+      if (this.notFoundLongEnough(transfer)) {
+        const failed = await this.walletTransactionRepo.update(
+          {
+            walletTransactionId: transfer.walletTransactionId,
+            status: WalletTransactionStatus.PENDING,
+          },
+          {
+            status: WalletTransactionStatus.FAILED,
+            message: 'Transfer not found at provider',
+            nextStatusCheckAt: null,
+            statusCheckAttempts: transfer.statusCheckAttempts + 1,
+          },
+        );
+
+        if (failed.affected === 1) {
+          this.logger.warn(
+            `Failed stuck pending transfer reference=${transfer.reference}: provider has no record since ${new Date(transfer.firstNotFoundAt).toISOString()}`,
+          );
+        }
+        return;
+      }
+
+      await this.scheduleNextStatusCheck(
+        transfer,
+        WalletTransactionStatus.PENDING,
+        { firstNotFoundAt: transfer.firstNotFoundAt ?? new Date() },
+      );
+      return;
+    }
+
+    if (
+      result.status === TransferStatusResult.PENDING &&
+      !result.providerStatus
+    ) {
+      await this.scheduleNextStatusCheck(
+        transfer,
+        WalletTransactionStatus.PENDING,
+      );
+      return;
+    }
+
+    const moved = await this.walletTransactionRepo.update(
+      {
+        walletTransactionId: transfer.walletTransactionId,
+        status: WalletTransactionStatus.PENDING,
+      },
+      {
+        status: WalletTransactionStatus.PROCESSING,
+        statusCheckAttempts: 0,
+        firstNotFoundAt: null,
+        nextStatusCheckAt: new Date(),
+      },
+    );
+
+    if (moved.affected === 1) {
+      this.logger.warn(
+        `Stuck pending transfer reference=${transfer.reference} found at provider; moved to PROCESSING`,
+      );
+    }
+  }
+
+  private notFoundLongEnough(transfer: WalletTransactions): boolean {
+    return (
+      !!transfer.firstNotFoundAt &&
+      Date.now() - new Date(transfer.firstNotFoundAt).getTime() >=
+        NOT_FOUND_FAIL_AFTER_MS
+    );
+  }
+
+  private async queryTransferStatus(transfer: WalletTransactions) {
+    const adapter = this.transferAdapterFactory.getTransferdapter(
+      transfer.provider,
+    );
+
+    return adapter.transactionStatusQuery({
+      environment: transfer.environment,
+      reference: transfer.reference,
+    });
+  }
+
+  private async scheduleNextStatusCheck(
+    transfer: WalletTransactions,
+    status: WalletTransactionStatus,
+    extra: Partial<Pick<WalletTransactions, 'firstNotFoundAt'>> = {},
+  ) {
+    await this.walletTransactionRepo.update(
+      { walletTransactionId: transfer.walletTransactionId, status },
+      {
+        ...extra,
+        statusCheckAttempts: transfer.statusCheckAttempts + 1,
+        nextStatusCheckAt: nextStatusCheckAt(transfer.statusCheckAttempts + 1),
+      },
+    );
   }
 }

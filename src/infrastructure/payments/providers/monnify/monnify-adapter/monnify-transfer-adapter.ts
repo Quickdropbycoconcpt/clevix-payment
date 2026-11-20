@@ -31,6 +31,10 @@ export class MonnifyTransferProvider implements TransferAdapter {
     });
   }
 
+  isAcceptedSubmission(result: unknown): boolean {
+    return result !== undefined && result !== null;
+  }
+
   async transactionStatusQuery(
     input: TransactionStatusQuery,
   ): Promise<TransactionQueryStatus> {
@@ -55,7 +59,9 @@ export class MonnifyTransferProvider implements TransferAdapter {
     }
   }
 
-  private toTransferStatusResult(providerStatus?: string): TransferStatusResult {
+  private toTransferStatusResult(
+    providerStatus?: string,
+  ): TransferStatusResult {
     switch (providerStatus) {
       case 'SUCCESS':
         return TransferStatusResult.SUCCESS;

@@ -11,6 +11,8 @@ export interface TransferAdapter {
   readonly provider: TransferProvider;
   processPaypout(input: TransferQueJobData);
 
+  isAcceptedSubmission(result: unknown): boolean;
+
   transactionStatusQuery(
     input: TransactionStatusQuery,
   ): Promise<TransactionQueryStatus>;

@@ -19,6 +19,10 @@ export class VfdTransferProvider implements TransferAdapter {
     const result = this.vfdClient.vfdTransfer(input);
     return result;
   }
+  isAcceptedSubmission(result: unknown): boolean {
+    return (result as { status?: string } | undefined)?.status === '00';
+  }
+
   async transactionStatusQuery(input: TransactionStatusQuery) {
     const result = await this.vfdClient.transactionStatusQuery(input);
     return result;
@@ -32,7 +36,10 @@ export class VfdTransferProvider implements TransferAdapter {
       input.accountNumber,
     );
 
-    if (account?.accountBalance === undefined || account.accountBalance === null) {
+    if (
+      account?.accountBalance === undefined ||
+      account.accountBalance === null
+    ) {
       throw new BadRequestException('Unable to fetch account balance');
     }
 

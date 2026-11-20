@@ -67,6 +67,16 @@ export class VfdClient {
   private readonly logger = new Logger(VfdClient.name);
   private readonly AUTH_CACHE_KEY = 'vfd_access_token';
   private readonly ACCOUNT_CREATION_TIMEOUT = 60000;
+  private readonly VFD_FAILED_TRANSFER_CODES = ['99', '91', '97'];
+  private readonly VFD_PENDING_TRANSFER_CODES = [
+    '01',
+    '02',
+    '09',
+    '25',
+    '94',
+    '96',
+    '500',
+  ];
   private readonly redis = new RedisConfig();
 
   async bvnLookup(input: { bvn: string; environment: string }): Promise<{
@@ -932,36 +942,87 @@ export class VfdClient {
   async transactionStatusQuery(
     input: TransactionStatusQuery,
   ): Promise<TransactionQueryStatus> {
+    const { reference, environment } = input;
+
     try {
-      const { reference, environment } = input;
       const credentials = this.credentialPicker(environment);
       const response = await this.withTokenRetry(environment, (token) =>
         firstValueFrom(
           this.httpService.get(
-            `${credentials.walletUrl}/transactions?reference=${reference}`,
-
+            `${credentials.walletUrl}/transactions?reference=${encodeURIComponent(reference)}`,
             axiosConfig(environment, token),
           ),
         ),
       );
-      const providerStatus = response?.data?.data?.transactionStatus;
 
-      return {
-        status: this.toTransferStatusResult(providerStatus),
-        providerStatus,
-        sessionId: response?.data?.data?.sessionId,
-        reference,
-      };
+      return this.toTransactionQueryStatus(reference, response.data);
     } catch (error: any) {
+      const errorData = isAxiosError(error) ? error.response?.data : undefined;
+
+      if (errorData?.status) {
+        return this.toTransactionQueryStatus(reference, errorData);
+      }
+
       this.logger.error(
-        JSON.stringify(error?.response?.data ?? { message: error?.message }),
+        `VFD transactionStatusQuery failed reference=${reference} response=${JSON.stringify(
+          errorData ?? { message: error?.message },
+        )}`,
       );
+
       return {
         status: TransferStatusResult.PENDING,
         sessionId: null,
-        reference: input.reference,
+        reference,
       };
     }
+  }
+
+  private toTransactionQueryStatus(
+    reference: string,
+    body: any,
+  ): TransactionQueryStatus {
+    const queryStatus = body?.status;
+
+    if (queryStatus === '108') {
+      return {
+        status: TransferStatusResult.NOT_FOUND,
+        providerStatus: queryStatus,
+        sessionId: null,
+        reference,
+      };
+    }
+
+    if (queryStatus !== '00') {
+      this.logger.error(
+        `VFD transactionStatusQuery unexpected response reference=${reference} response=${JSON.stringify(body)}`,
+      );
+
+      return {
+        status: TransferStatusResult.PENDING,
+        sessionId: null,
+        reference,
+      };
+    }
+
+    const transactionStatus = body?.data?.transactionStatus;
+    const status = this.toTransferStatusResult(transactionStatus);
+
+    if (
+      status === TransferStatusResult.PENDING &&
+      transactionStatus &&
+      !this.VFD_PENDING_TRANSFER_CODES.includes(transactionStatus)
+    ) {
+      this.logger.warn(
+        `VFD transactionStatusQuery unrecognised transactionStatus=${transactionStatus} reference=${reference}`,
+      );
+    }
+
+    return {
+      status,
+      providerStatus: transactionStatus,
+      sessionId: body?.data?.sessionId || null,
+      reference,
+    };
   }
 
   private toTransferStatusResult(
@@ -971,11 +1032,11 @@ export class VfdClient {
       return TransferStatusResult.SUCCESS;
     }
 
-    if (!providerStatus || providerStatus === '09') {
-      return TransferStatusResult.PENDING;
+    if (this.VFD_FAILED_TRANSFER_CODES.includes(providerStatus)) {
+      return TransferStatusResult.FAILED;
     }
 
-    return TransferStatusResult.FAILED;
+    return TransferStatusResult.PENDING;
   }
 
   async bvnImageMatch(input: {

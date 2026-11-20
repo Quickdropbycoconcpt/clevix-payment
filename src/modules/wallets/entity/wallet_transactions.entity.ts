@@ -16,6 +16,10 @@ import { Wallets } from './wallet.entity';
 
 @Entity('wallet_transactions')
 @Index(['walletId', 'createdAt'])
+@Index('IDX_wallet_transactions_status_next_check', [
+  'status',
+  'nextStatusCheckAt',
+])
 @Index(['businessId', 'environment', 'reference'], { unique: true })
 export class WalletTransactions extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -72,4 +76,13 @@ export class WalletTransactions extends BaseEntity {
 
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any> | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  nextStatusCheckAt: Date | null;
+
+  @Column({ type: 'int', default: 0 })
+  statusCheckAttempts: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  firstNotFoundAt: Date | null;
 }

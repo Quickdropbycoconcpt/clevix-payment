@@ -611,7 +611,7 @@ export class WalletService {
           currency,
           narration: input.narration ?? 'Naira payout',
           message: null,
-          status: WalletTransactionStatus.PROCESSING,
+          status: WalletTransactionStatus.PENDING,
           source: WalletTransactionSource.PAYOUT,
           sourceId: input.sourceId ?? null,
           idempotencyKey: walletDebitIdempotencyKey,
