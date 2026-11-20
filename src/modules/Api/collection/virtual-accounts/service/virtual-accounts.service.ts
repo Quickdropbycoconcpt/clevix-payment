@@ -267,7 +267,7 @@ export class VirtualAccountsService {
       environment: scope.environment,
       businessId: scope.businessId,
       accountType: AccountType.INDIVIDUAL,
-      address: dto.address.trim(),
+      address: dto.address?.trim() || null,
       provider,
       accountName: `${res.lastname} ${res.firstName}`,
     });
