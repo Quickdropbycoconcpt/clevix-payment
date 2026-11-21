@@ -42,7 +42,7 @@ export class VfdTransferProvider implements TransferAdapter {
     ) {
       throw new BadRequestException('Unable to fetch account balance');
     }
-
+    console.log(account);
     return {
       accountNumber: account.accountNo,
       balance: MoneyValueConverter.fromNairaToKobo(
