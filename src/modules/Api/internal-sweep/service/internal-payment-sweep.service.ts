@@ -92,11 +92,8 @@ export class InternalPaymentSweepService {
   }
 
   async sweepSubCorporateToCorporate(input: CorporateAccountSweep) {
-    const toAccount = await this.getCorporateAccountByAccountNumber(
-      input.mainCorporateAccount,
-    );
     return this.executeSweep({
-      provider: toAccount.provider,
+      provider: 'vfd',
       environment: input.environment,
       businessId: null,
       staticAccountId: null,
@@ -104,9 +101,9 @@ export class InternalPaymentSweepService {
       type: input.type,
       amount: input.amount,
       reference: input.reference,
-      fromAccount: this.mainCorporateAccount,
-      toAccount: toAccount.accountNumber,
-      toBankCode: toAccount.bankCode,
+      fromAccount: input.subAccountNumber,
+      toAccount: this.mainCorporateAccount,
+      toBankCode: '999999',
     });
   }
 
