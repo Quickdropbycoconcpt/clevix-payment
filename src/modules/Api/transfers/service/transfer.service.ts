@@ -6,9 +6,14 @@ import { TransferStatusResult } from '../types/transfer-provider';
 import {
   nextStatusCheckAt,
   NOT_FOUND_FAIL_AFTER_MS,
+  PENDING_CHECK_LOCK_KEY,
+  PENDING_CHECK_LOCK_TTL_MS,
+  PROCESSING_CHECK_LOCK_KEY,
+  PROCESSING_CHECK_LOCK_TTL_MS,
   STATUS_CHECK_BATCH_SIZE,
   STUCK_PENDING_AFTER_MS,
 } from '../types/transfer-status-check';
+import { RedisConfig } from 'src/infrastructure/redis/redis.config';
 import { WalletService } from 'src/modules/wallets/service/wallets.service';
 import { WithdrawalDto } from '../dto/transfer.dto';
 import { getBusinessScope, RequestScope } from 'src/shared/business-scope';
@@ -28,8 +33,7 @@ import { BanksService } from 'src/modules/Api/banks/service/banks.service';
 @Injectable()
 export class TransferService {
   private readonly logger = new Logger(TransferService.name);
-  private isCheckingProcessing = false;
-  private isCheckingPending = false;
+  private readonly redis = new RedisConfig();
 
   constructor(
     private readonly walletService: WalletService,
@@ -114,92 +118,89 @@ export class TransferService {
 
   @Cron('*/5 * * * * *')
   async validateOutgoingTransferStatus() {
-    if (this.isCheckingProcessing) {
-      return;
-    }
-
-    this.isCheckingProcessing = true;
-
     try {
-      const processingTransfers = await this.walletTransactionRepo.find({
-        where: [
-          {
-            status: WalletTransactionStatus.PROCESSING,
-            source: WalletTransactionSource.PAYOUT,
-            environment: RequestEnvironment.LIVE,
-            nextStatusCheckAt: LessThanOrEqual(new Date()),
-          },
-          {
-            status: WalletTransactionStatus.PROCESSING,
-            source: WalletTransactionSource.PAYOUT,
-            environment: RequestEnvironment.LIVE,
-            nextStatusCheckAt: IsNull(),
-          },
-        ],
-        order: { nextStatusCheckAt: { direction: 'ASC', nulls: 'FIRST' } },
-        take: STATUS_CHECK_BATCH_SIZE,
-      });
-
-      await Promise.allSettled(
-        processingTransfers.map((transfer) =>
-          this.settleProcessingTransfer(transfer),
-        ),
+      await this.redis.withLock(
+        PROCESSING_CHECK_LOCK_KEY,
+        PROCESSING_CHECK_LOCK_TTL_MS,
+        () => this.checkProcessingTransfers(),
       );
     } catch (error) {
       this.logger.error(
         'Failed to validate outgoing transfer status',
         error instanceof Error ? error.stack : String(error),
       );
-    } finally {
-      this.isCheckingProcessing = false;
     }
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
   async checkStuckPendingTransfers() {
-    if (this.isCheckingPending) {
-      return;
-    }
-
-    this.isCheckingPending = true;
-
     try {
-      const now = new Date();
-      const pendingTransfers = await this.walletTransactionRepo.find({
-        where: [
-          {
-            status: WalletTransactionStatus.PENDING,
-            source: WalletTransactionSource.PAYOUT,
-            environment: RequestEnvironment.LIVE,
-            createdAt: LessThanOrEqual(
-              new Date(now.getTime() - STUCK_PENDING_AFTER_MS),
-            ),
-            nextStatusCheckAt: LessThanOrEqual(now),
-          },
-          {
-            status: WalletTransactionStatus.PENDING,
-            source: WalletTransactionSource.PAYOUT,
-            environment: RequestEnvironment.LIVE,
-            createdAt: LessThanOrEqual(
-              new Date(now.getTime() - STUCK_PENDING_AFTER_MS),
-            ),
-            nextStatusCheckAt: IsNull(),
-          },
-        ],
-        order: { createdAt: 'ASC' },
-        take: STATUS_CHECK_BATCH_SIZE,
-      });
-
-      for (const transfer of pendingTransfers) {
-        await this.checkStuckPendingTransfer(transfer);
-      }
+      await this.redis.withLock(
+        PENDING_CHECK_LOCK_KEY,
+        PENDING_CHECK_LOCK_TTL_MS,
+        () => this.checkPendingTransfers(),
+      );
     } catch (error) {
       this.logger.error(
         'Failed to check stuck pending transfers',
         error instanceof Error ? error.stack : String(error),
       );
-    } finally {
-      this.isCheckingPending = false;
+    }
+  }
+
+  private async checkProcessingTransfers() {
+    const processingTransfers = await this.walletTransactionRepo.find({
+      where: [
+        {
+          status: WalletTransactionStatus.PROCESSING,
+          source: WalletTransactionSource.PAYOUT,
+          environment: RequestEnvironment.LIVE,
+          nextStatusCheckAt: LessThanOrEqual(new Date()),
+        },
+        {
+          status: WalletTransactionStatus.PROCESSING,
+          source: WalletTransactionSource.PAYOUT,
+          environment: RequestEnvironment.LIVE,
+          nextStatusCheckAt: IsNull(),
+        },
+      ],
+      order: { nextStatusCheckAt: { direction: 'ASC', nulls: 'FIRST' } },
+      take: STATUS_CHECK_BATCH_SIZE,
+    });
+
+    await Promise.allSettled(
+      processingTransfers.map((transfer) =>
+        this.settleProcessingTransfer(transfer),
+      ),
+    );
+  }
+
+  private async checkPendingTransfers() {
+    const now = new Date();
+    const stuckBefore = new Date(now.getTime() - STUCK_PENDING_AFTER_MS);
+    const pendingTransfers = await this.walletTransactionRepo.find({
+      where: [
+        {
+          status: WalletTransactionStatus.PENDING,
+          source: WalletTransactionSource.PAYOUT,
+          environment: RequestEnvironment.LIVE,
+          createdAt: LessThanOrEqual(stuckBefore),
+          nextStatusCheckAt: LessThanOrEqual(now),
+        },
+        {
+          status: WalletTransactionStatus.PENDING,
+          source: WalletTransactionSource.PAYOUT,
+          environment: RequestEnvironment.LIVE,
+          createdAt: LessThanOrEqual(stuckBefore),
+          nextStatusCheckAt: IsNull(),
+        },
+      ],
+      order: { createdAt: 'ASC' },
+      take: STATUS_CHECK_BATCH_SIZE,
+    });
+
+    for (const transfer of pendingTransfers) {
+      await this.checkStuckPendingTransfer(transfer);
     }
   }
 

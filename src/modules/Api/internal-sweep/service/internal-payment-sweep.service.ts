@@ -50,7 +50,7 @@ export class InternalPaymentSweepService {
     @InjectRepository(SweepPaymentTransactions)
     private readonly sweepTransactionRepo: Repository<SweepPaymentTransactions>,
   ) {}
-  private readonly mainCorporateAccount = '1038227462';
+  private readonly mainCorporateAccount = '1047723548';
   async sweepCorporateToStatic(input: StaticAccountSweep) {
     const staticAccount = await this.getStaticAccount(
       input.staticAccountNumber,

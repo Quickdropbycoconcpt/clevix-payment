@@ -10,6 +10,14 @@ export const NOT_FOUND_FAIL_AFTER_MS = 5 * 60_000;
 
 export const STATUS_CHECK_BATCH_SIZE = 50;
 
+export const PROCESSING_CHECK_LOCK_KEY = 'lock:transfers:tsq:processing';
+
+export const PENDING_CHECK_LOCK_KEY = 'lock:transfers:tsq:pending';
+
+export const PROCESSING_CHECK_LOCK_TTL_MS = 60_000;
+
+export const PENDING_CHECK_LOCK_TTL_MS = 5 * 60_000;
+
 export function nextStatusCheckAt(attempts: number): Date {
   const delay =
     STATUS_CHECK_BACKOFF_MS[

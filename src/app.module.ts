@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { DatabaseModule } from './infrastructure/database/database.module';
 import { AuthenticationModule } from './modules/authentication/auth.module';
 import { BusinessMembersModule } from './modules/business-members/business-members.module';
@@ -72,9 +70,7 @@ import { InternalPaymentSwipeModule } from './modules/Api/internal-sweep/interna
     TokenModule,
     InternalPaymentSwipeModule,
   ],
-  controllers: [AppController],
   providers: [
-    AppService,
     {
       provide: APP_INTERCEPTOR,
       useClass: PaginationInterceptor,
