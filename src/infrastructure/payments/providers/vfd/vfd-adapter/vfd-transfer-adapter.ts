@@ -3,7 +3,6 @@ import { VfdClient } from '../vfd.client';
 import {
   AccountBalance,
   AccountBalanceEnquiry,
-  TransactionQueryStatus,
   TransactionStatusQuery,
   TransferProvider,
 } from 'src/modules/Api/transfers/types/transfer-provider';
@@ -42,12 +41,24 @@ export class VfdTransferProvider implements TransferAdapter {
     ) {
       throw new BadRequestException('Unable to fetch account balance');
     }
-    console.log(account);
+
     return {
       accountNumber: account.accountNo,
       balance: MoneyValueConverter.fromNairaToKobo(
-        String(account.accountBalance),
+        this.toKoboPrecision(String(account.accountBalance)),
       ).toString(),
     };
+  }
+
+  private toKoboPrecision(amount: string): string {
+    const match = /^(\d+)(?:\.(\d*))?$/.exec(amount.trim());
+
+    if (!match) {
+      throw new BadRequestException('Unable to fetch account balance');
+    }
+
+    const [, whole, decimal = ''] = match;
+
+    return `${whole}.${decimal.slice(0, 2).padEnd(2, '0')}`;
   }
 }
