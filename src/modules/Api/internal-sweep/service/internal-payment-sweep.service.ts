@@ -60,7 +60,10 @@ export class InternalPaymentSweepService {
     );
 
     return this.executeSweep({
-      ...this.staticAccountContext(staticAccount),
+      provider: staticAccount.provider,
+      environment: staticAccount.environment,
+      staticAccountId: staticAccount.walletAccountId,
+      businessId: staticAccount.businessId,
       direction: SweepDirection.CORPORATE_TO_STATIC,
       type: input.type,
       amount: input.amount,
@@ -80,7 +83,10 @@ export class InternalPaymentSweepService {
     );
 
     return this.executeSweep({
-      ...this.staticAccountContext(staticAccount),
+      provider: staticAccount.provider,
+      environment: staticAccount.environment,
+      staticAccountId: staticAccount.walletAccountId,
+      businessId: staticAccount.businessId,
       direction: SweepDirection.STATIC_TO_CORPORATE,
       type: input.type,
       amount: input.amount,
