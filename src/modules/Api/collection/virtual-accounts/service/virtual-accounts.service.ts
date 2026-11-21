@@ -401,7 +401,7 @@ export class VirtualAccountsService {
           amount: result.amount.toString(),
           type: SweepType.DEPOSIT,
           staticAccountNumber: result.receivedAccountNumber,
-          reference: result.reference,
+          reference: `${result.reference}-SWP`,
         });
       }
       return {
