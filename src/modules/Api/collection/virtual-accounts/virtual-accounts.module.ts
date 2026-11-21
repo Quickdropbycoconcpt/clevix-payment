@@ -14,6 +14,7 @@ import { TransactionModule } from 'src/modules/transactions/transactions.module'
 import { ReconciliationModule } from 'src/modules/reconciliation/reconciliation.module';
 import { StaticWalletAccounts } from './entity/wallet_account.entity';
 import { SettlementManagementModule } from 'src/modules/settlement-management/settlement-management.module';
+import { InternalPaymentSwipeModule } from '../../internal-sweep/internal-sweep.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SettlementManagementModule } from 'src/modules/settlement-management/se
     TransactionModule,
     ReconciliationModule,
     SettlementManagementModule,
+    InternalPaymentSwipeModule,
   ],
   controllers: [VirtualAccountsController],
   providers: [
