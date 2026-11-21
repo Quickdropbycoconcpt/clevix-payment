@@ -38,6 +38,8 @@ import {
 } from '../dto/create-static-account.dto';
 import { StaticWalletAccounts } from '../entity/wallet_account.entity';
 import { CreateDynamicVirtualAccountInput } from '../interface/virtual-account.interface';
+import { InternalPaymentSweepService } from 'src/modules/Api/internal-sweep/service/internal-payment-sweep.service';
+import { SweepType } from 'src/modules/Api/internal-sweep/interface/sweep-transfer.interface';
 
 type DynamicVirtualAccountInput = CreateDynamicVirtualAccountInput & {
   transactionSource?: TransactionSource;
@@ -56,6 +58,7 @@ export class VirtualAccountsService {
     @InjectRepository(StaticWalletAccounts)
     private readonly walletAcct: Repository<StaticWalletAccounts>,
     private readonly txnService: TransactionService,
+    private readonly moneySweepService: InternalPaymentSweepService,
   ) {}
   async generateDynamicVirtualAccount(
     dto: DynamicVirtualAccountInput,
@@ -331,6 +334,8 @@ export class VirtualAccountsService {
     provider: string,
     apiKey: string,
   ): Promise<VirtualAccountCreditResponse> {
+    //one to one provider doesn't move money into our corpoerate automatically
+    const OneToOneProvider = ['vfd'];
     try {
       await this.checkProviderHeader(apiKey, provider);
       const adapter =
@@ -391,6 +396,14 @@ export class VirtualAccountsService {
         customerEmail: dva?.customerEmail ?? null,
       });
 
+      if (OneToOneProvider.includes(provider) && walletAccount) {
+        await this.moneySweepService.sweepStaticToCorporate({
+          amount: result.amount.toString(),
+          type: SweepType.DEPOSIT,
+          staticAccountNumber: result.receivedAccountNumber,
+          reference: result.reference,
+        });
+      }
       return {
         ...result,
         reference: dva?.merchantReference ?? result.reference,
