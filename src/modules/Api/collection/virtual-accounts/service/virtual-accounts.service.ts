@@ -40,6 +40,7 @@ import { StaticWalletAccounts } from '../entity/wallet_account.entity';
 import { CreateDynamicVirtualAccountInput } from '../interface/virtual-account.interface';
 import { InternalPaymentSweepService } from 'src/modules/Api/internal-sweep/service/internal-payment-sweep.service';
 import { SweepType } from 'src/modules/Api/internal-sweep/interface/sweep-transfer.interface';
+import { MoneyValueConverter } from 'src/shared/converter';
 
 type DynamicVirtualAccountInput = CreateDynamicVirtualAccountInput & {
   transactionSource?: TransactionSource;
@@ -397,12 +398,7 @@ export class VirtualAccountsService {
       });
 
       if (OneToOneProvider.includes(provider) && walletAccount) {
-        await this.moneySweepService.sweepStaticToCorporate({
-          amount: result.amount.toString(),
-          type: SweepType.DEPOSIT,
-          staticAccountNumber: result.receivedAccountNumber,
-          reference: `${result.reference}-SWP`,
-        });
+        this.sweepStaticCredit(result);
       }
       return {
         ...result,
@@ -412,6 +408,29 @@ export class VirtualAccountsService {
       this.logger.fatal(error.message);
       throw error;
     }
+  }
+
+  private sweepStaticCredit(credit: VirtualAccountCreditResponse) {
+    const reference = `${credit.reference}-SWP`;
+
+    Promise.resolve()
+      .then(() =>
+        this.moneySweepService.sweepStaticToCorporate({
+          amount: MoneyValueConverter.fromNairaToKobo(
+            credit.amount.toString(),
+          ).toString(),
+          type: SweepType.DEPOSIT,
+          staticAccountNumber: credit.receivedAccountNumber,
+          reference,
+        }),
+      )
+      .catch((error: unknown) => {
+        this.logger.error(
+          `Static account sweep failed reference=${reference} account=${credit.receivedAccountNumber}: ${
+            error instanceof Error ? error.message : JSON.stringify(error)
+          }`,
+        );
+      });
   }
 
   private async checkProviderHeader(incomingHeader: string, provider: string) {

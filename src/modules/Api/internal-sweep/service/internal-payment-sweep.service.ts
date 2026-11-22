@@ -20,6 +20,7 @@ import {
 } from '../interface/sweep-transfer.interface';
 import { InternalCoporateAccount } from '../entity/internal-accounts.entity';
 import { TransferStatusResult } from 'src/modules/Api/transfers/types/transfer-provider';
+import { NOT_FOUND_FAIL_AFTER_MS } from 'src/modules/Api/transfers/types/transfer-status-check';
 import { SweepPaymentTransactions } from '../entity/sweep-transactions.entity';
 import { serviceConfigurationError } from 'src/shared/utils';
 
@@ -113,7 +114,7 @@ export class InternalPaymentSweepService {
     });
   }
 
-  // @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_10_SECONDS)
   async VFDLUXSWEEP() {
     const subAccountNumber = process.env.VFD_LUX;
 
@@ -184,16 +185,36 @@ export class InternalPaymentSweepService {
             reference: sweep.reference,
           });
 
-          if (result.status !== TransferStatusResult.SUCCESS) {
+          const notFoundTooLong =
+            result.status === TransferStatusResult.NOT_FOUND &&
+            Date.now() - new Date(sweep.createdAt).getTime() >=
+              NOT_FOUND_FAIL_AFTER_MS;
+
+          if (
+            result.status !== TransferStatusResult.SUCCESS &&
+            result.status !== TransferStatusResult.FAILED &&
+            !notFoundTooLong
+          ) {
             return;
           }
 
-          await this.sweepTransactionRepo.update(
-            { sweepTransactionId: sweep.sweepTransactionId },
-            { status: TransactionStatus.SUCCESS },
+          const status =
+            result.status === TransferStatusResult.SUCCESS
+              ? TransactionStatus.SUCCESS
+              : TransactionStatus.FAILED;
+          const settled = await this.sweepTransactionRepo.update(
+            {
+              sweepTransactionId: sweep.sweepTransactionId,
+              status: TransactionStatus.PROCESSING,
+            },
+            { status },
           );
 
-          this.logger.log(`Confirmed sweep reference=${sweep.reference}`);
+          if (settled.affected === 1) {
+            this.logger.log(
+              `Settled sweep reference=${sweep.reference} status=${status} providerStatus=${result.providerStatus}`,
+            );
+          }
         }),
       );
     } catch (error) {
@@ -237,9 +258,10 @@ export class InternalPaymentSweepService {
     );
 
     const adapter = this.transferAdapterFactory.getTransferdapter(provider);
+    let result: unknown;
 
     try {
-      await adapter.processPaypout({
+      result = await adapter.processPaypout({
         senderAccount: input.fromAccount,
         accountNumber: input.toAccount,
         accountName: input.toAccount,
@@ -252,30 +274,48 @@ export class InternalPaymentSweepService {
         environment,
         provider,
       });
+    } catch (error) {
+      await this.markSweepProcessing(sweepTransaction.sweepTransactionId);
 
-      await this.sweepTransactionRepo.update(
-        { sweepTransactionId: sweepTransaction.sweepTransactionId },
-        { status: TransactionStatus.PROCESSING },
-      );
-
-      this.logger.log(
-        `Initiated sweep reference=${reference} direction=${direction} amount=${amount}`,
+      this.logger.error(
+        `Sweep submission outcome unknown reference=${reference} direction=${direction}; left PROCESSING for status check`,
+        error instanceof Error ? error.stack : String(error),
       );
 
       return { reference, status: TransactionStatus.PROCESSING };
-    } catch (error) {
-      await this.sweepTransactionRepo.update(
-        { sweepTransactionId: sweepTransaction.sweepTransactionId },
-        { status: TransactionStatus.FAILED },
-      );
+    }
+
+    if (!adapter.isAcceptedSubmission(result)) {
+      await this.markSweepFailed(sweepTransaction.sweepTransactionId);
 
       this.logger.error(
-        `Failed sweep reference=${reference} direction=${direction}`,
-        error instanceof Error ? error.stack : String(error),
+        `Rejected sweep reference=${reference} direction=${direction} response=${JSON.stringify(result)}`,
       );
 
       throw new BadRequestException('Unable to initiate sweep');
     }
+
+    await this.markSweepProcessing(sweepTransaction.sweepTransactionId);
+
+    this.logger.log(
+      `Initiated sweep reference=${reference} direction=${direction} amount=${amount}`,
+    );
+
+    return { reference, status: TransactionStatus.PROCESSING };
+  }
+
+  private async markSweepProcessing(sweepTransactionId: string) {
+    await this.sweepTransactionRepo.update(
+      { sweepTransactionId, status: TransactionStatus.INITIATED },
+      { status: TransactionStatus.PROCESSING },
+    );
+  }
+
+  private async markSweepFailed(sweepTransactionId: string) {
+    await this.sweepTransactionRepo.update(
+      { sweepTransactionId, status: TransactionStatus.INITIATED },
+      { status: TransactionStatus.FAILED },
+    );
   }
 
   private staticAccountContext(staticAccount: StaticWalletAccounts) {
