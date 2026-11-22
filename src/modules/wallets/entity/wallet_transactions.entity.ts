@@ -5,6 +5,7 @@ import {
   WalletTransactionType,
 } from 'src/shared/enum';
 import {
+  Check,
   Column,
   Entity,
   Index,
@@ -21,6 +22,10 @@ import { Wallets } from './wallet.entity';
   'nextStatusCheckAt',
 ])
 @Index(['businessId', 'environment', 'reference'], { unique: true })
+@Check(
+  'CHK_wallet_transactions_amount_breakdown',
+  '"principalAmount" IS NULL OR "merchantFee" IS NULL OR "amount" = "principalAmount" + "merchantFee"',
+)
 export class WalletTransactions extends BaseEntity {
   @PrimaryGeneratedColumn('uuid')
   walletTransactionId: string;
@@ -46,6 +51,15 @@ export class WalletTransactions extends BaseEntity {
 
   @Column({ type: 'bigint' })
   amount: string;
+
+  @Column({ type: 'bigint', nullable: true })
+  principalAmount: string | null;
+
+  @Column({ type: 'bigint', nullable: true })
+  merchantFee: string | null;
+
+  @Column({ type: 'bigint', nullable: true })
+  providerFee: string | null;
 
   @Column({ type: 'bigint' })
   availableBalanceBefore: string;

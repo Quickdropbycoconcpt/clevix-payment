@@ -43,7 +43,11 @@ export class LedgerService {
   }
 
   async ledgerPosting(input: LedgerPostingInput, entityManager: EntityManager) {
-    const { environment, amount, currency, entries } = input;
+    const { environment, amount, currency } = input;
+    const entries = input.entries.filter(
+      (entry) =>
+        toIntegerAmountBigInt(entry.amount, 'Ledger entry amount') !== 0n,
+    );
 
     if (!entries.length) {
       throw new BadRequestException('Ledger posting requires entries');
@@ -59,8 +63,8 @@ export class LedgerService {
         'Ledger entry amount',
       );
 
-      if (entryAmount <= 0n) {
-        throw new BadRequestException('Ledger entry amount must be positive');
+      if (entryAmount < 0n) {
+        throw new BadRequestException('Ledger entry amount cannot be negative');
       }
 
       if (entry.direction === LedgerEntryDirection.DEBIT) {

@@ -18,6 +18,14 @@ export const PROCESSING_CHECK_LOCK_TTL_MS = 60_000;
 
 export const PENDING_CHECK_LOCK_TTL_MS = 5 * 60_000;
 
+export const PROVIDER_FAILURE_MESSAGE_PREFIX = 'Provider status';
+
+export const NOT_FOUND_BEFORE_SUBMISSION_MESSAGE =
+  'Transfer not found at provider';
+
+export const NOT_FOUND_AFTER_SUBMISSION_MESSAGE =
+  'Transfer not found at provider after submission';
+
 export function nextStatusCheckAt(attempts: number): Date {
   const delay =
     STATUS_CHECK_BACKOFF_MS[

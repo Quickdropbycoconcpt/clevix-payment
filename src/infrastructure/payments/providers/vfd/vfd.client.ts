@@ -67,14 +67,15 @@ export class VfdClient {
   private readonly logger = new Logger(VfdClient.name);
   private readonly AUTH_CACHE_KEY = 'vfd_access_token';
   private readonly ACCOUNT_CREATION_TIMEOUT = 60000;
-  private readonly VFD_FAILED_TRANSFER_CODES = ['99', '91', '97'];
+  private readonly VFD_FAILED_TRANSFER_CODES = ['98', '99', '02'];
   private readonly VFD_PENDING_TRANSFER_CODES = [
     '01',
-    '02',
     '09',
     '25',
+    '91',
     '94',
     '96',
+    '97',
     '500',
   ];
   private readonly redis = new RedisConfig();

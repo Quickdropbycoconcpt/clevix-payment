@@ -471,7 +471,6 @@ export class WalletService {
       );
 
     const totalMerchantDebit = grossPayoutAmount + merchantFee;
-    const revenue = merchantFee - providerFee;
 
     /**
      * Avoid double spend by using database lock.
@@ -559,38 +558,49 @@ export class WalletService {
         },
         entityManager,
       );
+      const providerFeeExpenseLedger =
+        await this.ledgerService.findOrCreateLedgerAccount(
+          {
+            ownerId: `${provider}-fee`,
+            ownerType: LedgerAccountOwnerType.PROVIDER,
+            accountType: LedgerAccountType.PROVIDER_FEE_EXPENSE,
+            currency,
+            environment,
+          },
+          entityManager,
+        );
       await this.ledgerService.ledgerPosting(
         {
           reference,
           environment,
           businessId: input.businessId,
           transactionType: input.source,
-          amount: totalMerchantDebit.toString(),
+          amount: (totalMerchantDebit + providerFee).toString(),
           currency: input.currency,
           entries: [
             {
-              ledgerAccountId: providerLedger.ledgerAccountId,
-              direction: LedgerEntryDirection.CREDIT,
-              amount: grossPayoutAmount.toString(), //1000 amount we payout from provider wallet
-              memo: 'Provider Settlement Payable',
-            },
-            {
-              ledgerAccountId: providerLedger.ledgerAccountId,
-              direction: LedgerEntryDirection.CREDIT, //10
-              amount: providerFee.toString(),
-              memo: 'Provider payout fee deduction',
-            },
-            {
               ledgerAccountId: businessLedgerAccount.ledgerAccountId,
               direction: LedgerEntryDirection.DEBIT,
-              amount: totalMerchantDebit.toString(), //1020
-              memo: 'Total payout from merchant  wallet',
+              amount: totalMerchantDebit.toString(),
+              memo: 'Total payout from merchant wallet',
+            },
+            {
+              ledgerAccountId: providerFeeExpenseLedger.ledgerAccountId,
+              direction: LedgerEntryDirection.DEBIT,
+              amount: providerFee.toString(),
+              memo: 'Provider payout fee',
+            },
+            {
+              ledgerAccountId: providerLedger.ledgerAccountId,
+              direction: LedgerEntryDirection.CREDIT,
+              amount: (grossPayoutAmount + providerFee).toString(),
+              memo: 'Provider settlement payable',
             },
             {
               ledgerAccountId: revenueLedger.ledgerAccountId,
               direction: LedgerEntryDirection.CREDIT,
-              amount: revenue.toString(), //20
-              memo: 'Platform payout  fee revenue',
+              amount: merchantFee.toString(),
+              memo: 'Platform payout fee revenue',
             },
           ],
         },
@@ -606,6 +616,9 @@ export class WalletService {
           provider: input.provider,
           transactionType: WalletTransactionType.DEBIT,
           amount: totalMerchantDebit.toString(),
+          principalAmount: grossPayoutAmount.toString(),
+          merchantFee: merchantFee.toString(),
+          providerFee: providerFee.toString(),
           availableBalanceBefore: availableBalanceBefore.toString(),
           availableBalanceAfter: availableBalanceAfter.toString(),
           currency,
@@ -616,16 +629,225 @@ export class WalletService {
           sourceId: input.sourceId ?? null,
           idempotencyKey: walletDebitIdempotencyKey,
           metadata: {
-            payoutAmount: grossPayoutAmount.toString(),
-            merchantFee: merchantFee.toString(),
-            providerFee: providerFee.toString(),
-            revenue: revenue.toString(),
             merchantReference: input.merchantReference,
             reference: input.reference,
           },
         }),
       );
     });
+  }
+
+  async failAndReversePayout(
+    walletTransactionId: string,
+    expectedStatus: WalletTransactionStatus,
+    failure: Pick<
+      WalletTransactions,
+      'message' | 'providerReference' | 'statusCheckAttempts'
+    >,
+  ): Promise<WalletTransactions | null> {
+    return this.walletRepo.manager.transaction(async (entityManager) => {
+      const walletTransactionRepo =
+        entityManager.getRepository(WalletTransactions);
+      const debit = await walletTransactionRepo.findOne({
+        where: {
+          walletTransactionId,
+          source: WalletTransactionSource.PAYOUT,
+          transactionType: WalletTransactionType.DEBIT,
+        },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (debit?.status !== expectedStatus) {
+        return null;
+      }
+
+      const wallet = await entityManager.getRepository(Wallets).findOne({
+        where: { walletId: debit.walletId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!wallet) {
+        throw new BadRequestException('Wallet not found');
+      }
+
+      if (
+        debit.principalAmount === null ||
+        debit.merchantFee === null ||
+        debit.providerFee === null
+      ) {
+        throw new BadRequestException(
+          `Payout debit ${debit.reference} has no amount breakdown; refund needs manual review`,
+        );
+      }
+
+      const refundAmount = BigInt(debit.amount);
+      const payoutAmount = BigInt(debit.principalAmount);
+      const merchantFee = BigInt(debit.merchantFee);
+      const providerFee = BigInt(debit.providerFee);
+
+      if (refundAmount <= 0n || payoutAmount + merchantFee !== refundAmount) {
+        throw new BadRequestException(
+          `Payout debit ${debit.reference} has inconsistent amounts; refund needs manual review`,
+        );
+      }
+
+      const reversed = await walletTransactionRepo.update(
+        {
+          walletTransactionId: debit.walletTransactionId,
+          status: expectedStatus,
+        },
+        {
+          status: WalletTransactionStatus.REVERSED,
+          message: failure.message,
+          providerReference: failure.providerReference,
+          statusCheckAttempts: failure.statusCheckAttempts,
+          nextStatusCheckAt: null,
+        },
+      );
+
+      if (reversed.affected !== 1) {
+        return null;
+      }
+
+      await this.postPayoutReversalLedger(
+        debit,
+        { refundAmount, payoutAmount, merchantFee, providerFee },
+        entityManager,
+      );
+
+      const availableBalanceBefore = BigInt(wallet.balance);
+
+      await this.creditSpendableWalletBalance(
+        wallet.walletId,
+        refundAmount,
+        entityManager,
+      );
+
+      return walletTransactionRepo.save(
+        walletTransactionRepo.create({
+          businessId: debit.businessId,
+          environment: debit.environment,
+          walletId: wallet.walletId,
+          reference: `${debit.reference}-REFUND`,
+          providerReference: debit.providerReference,
+          provider: debit.provider,
+          transactionType: WalletTransactionType.CREDIT,
+          amount: refundAmount.toString(),
+          principalAmount: debit.principalAmount,
+          merchantFee: debit.merchantFee,
+          providerFee: debit.providerFee,
+          availableBalanceBefore: availableBalanceBefore.toString(),
+          availableBalanceAfter: (
+            availableBalanceBefore + refundAmount
+          ).toString(),
+          currency: debit.currency,
+          narration: `Refund for failed payout ${debit.reference}`,
+          message: failure.message,
+          status: WalletTransactionStatus.COMPLETED,
+          source: WalletTransactionSource.REVERSAL,
+          sourceId: debit.walletTransactionId,
+          idempotencyKey: `wallet-refund:${debit.businessId}:${debit.reference}`,
+          metadata: {
+            ...debit.metadata,
+            reversedWalletTransactionId: debit.walletTransactionId,
+          },
+        }),
+      );
+    });
+  }
+
+  private async postPayoutReversalLedger(
+    debit: WalletTransactions,
+    amounts: {
+      refundAmount: bigint;
+      payoutAmount: bigint;
+      merchantFee: bigint;
+      providerFee: bigint;
+    },
+    entityManager: EntityManager,
+  ) {
+    const { businessId, currency, environment } = debit;
+    const provider = debit.provider ?? '';
+    const businessLedgerAccount =
+      await this.ledgerService.findOrCreateLedgerAccount(
+        {
+          ownerId: businessId,
+          ownerType: LedgerAccountOwnerType.BUSINESS,
+          accountType: LedgerAccountType.CUSTOMER_CASH,
+          currency,
+          environment,
+        },
+        entityManager,
+      );
+    const providerLedger = await this.ledgerService.findOrCreateLedgerAccount(
+      {
+        ownerId: provider,
+        ownerType: LedgerAccountOwnerType.PROVIDER,
+        accountType: LedgerAccountType.PROVIDER_SETTLEMENT,
+        currency,
+        environment,
+      },
+      entityManager,
+    );
+    const revenueLedger = await this.ledgerService.findOrCreateLedgerAccount(
+      {
+        ownerId: 'clevix-revenue',
+        ownerType: LedgerAccountOwnerType.SYSTEM,
+        accountType: LedgerAccountType.FEES_REVENUE,
+        currency,
+        environment,
+      },
+      entityManager,
+    );
+    const providerFeeExpenseLedger =
+      await this.ledgerService.findOrCreateLedgerAccount(
+        {
+          ownerId: `${provider}-fee`,
+          ownerType: LedgerAccountOwnerType.PROVIDER,
+          accountType: LedgerAccountType.PROVIDER_FEE_EXPENSE,
+          currency,
+          environment,
+        },
+        entityManager,
+      );
+
+    await this.ledgerService.ledgerPosting(
+      {
+        reference: `${debit.reference}-REFUND`,
+        environment,
+        businessId,
+        transactionType: WalletTransactionSource.REVERSAL,
+        amount: (amounts.refundAmount + amounts.providerFee).toString(),
+        currency,
+        entries: [
+          {
+            ledgerAccountId: providerLedger.ledgerAccountId,
+            direction: LedgerEntryDirection.DEBIT,
+            amount: (amounts.payoutAmount + amounts.providerFee).toString(),
+            memo: 'Reversal of provider settlement payable',
+          },
+          {
+            ledgerAccountId: revenueLedger.ledgerAccountId,
+            direction: LedgerEntryDirection.DEBIT,
+            amount: amounts.merchantFee.toString(),
+            memo: 'Reversal of platform payout fee revenue',
+          },
+          {
+            ledgerAccountId: businessLedgerAccount.ledgerAccountId,
+            direction: LedgerEntryDirection.CREDIT,
+            amount: amounts.refundAmount.toString(),
+            memo: 'Refund of failed payout to merchant wallet',
+          },
+          {
+            ledgerAccountId: providerFeeExpenseLedger.ledgerAccountId,
+            direction: LedgerEntryDirection.CREDIT,
+            amount: amounts.providerFee.toString(),
+            memo: 'Reversal of provider payout fee',
+          },
+        ],
+      },
+      entityManager,
+    );
   }
 
   async findOrCreateWallet(

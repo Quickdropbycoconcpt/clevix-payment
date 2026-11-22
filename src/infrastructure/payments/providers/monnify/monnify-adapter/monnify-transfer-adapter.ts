@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ProviderException } from 'src/shared/exceptions/provider.exception';
 import { TransferAdapter } from 'src/modules/Api/transfers/adapters/contracts/transfer.adapter';
 import {
   AccountBalance,
@@ -15,6 +16,8 @@ import { MonnifyClient } from '../monnify.client';
 @Injectable()
 export class MonnifyTransferProvider implements TransferAdapter {
   readonly provider = TransferProvider.MONNIFY;
+  private readonly TRANSFER_NOT_FOUND_CODE = 'D02';
+  private readonly HTTP_NOT_FOUND = 404;
 
   constructor(private readonly monnifyClient: MonnifyClient) {}
 
@@ -50,13 +53,30 @@ export class MonnifyTransferProvider implements TransferAdapter {
         sessionId: result.sessionId,
         reference: input.reference,
       };
-    } catch {
+    } catch (error) {
+      if (this.isTransferNotFound(error)) {
+        return {
+          status: TransferStatusResult.NOT_FOUND,
+          providerStatus: this.TRANSFER_NOT_FOUND_CODE,
+          sessionId: null,
+          reference: input.reference,
+        };
+      }
+
       return {
         status: TransferStatusResult.PENDING,
         sessionId: null,
         reference: input.reference,
       };
     }
+  }
+
+  private isTransferNotFound(error: unknown): boolean {
+    return (
+      error instanceof ProviderException &&
+      error.context.providerHttpStatus === this.HTTP_NOT_FOUND &&
+      error.context.providerCode === this.TRANSFER_NOT_FOUND_CODE
+    );
   }
 
   private toTransferStatusResult(

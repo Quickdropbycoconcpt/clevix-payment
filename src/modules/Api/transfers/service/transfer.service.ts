@@ -5,11 +5,14 @@ import { IsNull, LessThanOrEqual, Repository } from 'typeorm';
 import { TransferStatusResult } from '../types/transfer-provider';
 import {
   nextStatusCheckAt,
+  NOT_FOUND_AFTER_SUBMISSION_MESSAGE,
+  NOT_FOUND_BEFORE_SUBMISSION_MESSAGE,
   NOT_FOUND_FAIL_AFTER_MS,
   PENDING_CHECK_LOCK_KEY,
   PENDING_CHECK_LOCK_TTL_MS,
   PROCESSING_CHECK_LOCK_KEY,
   PROCESSING_CHECK_LOCK_TTL_MS,
+  PROVIDER_FAILURE_MESSAGE_PREFIX,
   STATUS_CHECK_BATCH_SIZE,
   STUCK_PENDING_AFTER_MS,
 } from '../types/transfer-status-check';
@@ -199,37 +202,27 @@ export class TransferService {
       take: STATUS_CHECK_BATCH_SIZE,
     });
 
-    for (const transfer of pendingTransfers) {
-      await this.checkStuckPendingTransfer(transfer);
-    }
+    await Promise.allSettled(
+      pendingTransfers.map((transfer) =>
+        this.checkStuckPendingTransfer(transfer),
+      ),
+    );
   }
 
   private async settleProcessingTransfer(transfer: WalletTransactions) {
     const result = await this.queryTransferStatus(transfer);
 
-    if (
-      result.status === TransferStatusResult.SUCCESS ||
-      result.status === TransferStatusResult.FAILED
-    ) {
+    if (result.status === TransferStatusResult.SUCCESS) {
       const settled = await this.walletTransactionRepo.update(
         {
           walletTransactionId: transfer.walletTransactionId,
           status: WalletTransactionStatus.PROCESSING,
         },
         {
-          status:
-            result.status === TransferStatusResult.SUCCESS
-              ? WalletTransactionStatus.COMPLETED
-              : WalletTransactionStatus.FAILED,
+          status: WalletTransactionStatus.COMPLETED,
           providerReference: result.sessionId ?? transfer.providerReference,
           nextStatusCheckAt: null,
           statusCheckAttempts: transfer.statusCheckAttempts + 1,
-          ...(result.status === TransferStatusResult.FAILED
-            ? {
-                message:
-                  `Provider status ${result.providerStatus ?? ''}`.trim(),
-              }
-            : {}),
         },
       );
 
@@ -238,6 +231,16 @@ export class TransferService {
           `Settled transfer reference=${transfer.reference} status=${result.status} providerStatus=${result.providerStatus}`,
         );
       }
+      return;
+    }
+
+    if (result.status === TransferStatusResult.FAILED) {
+      await this.failAndRefund(
+        transfer,
+        WalletTransactionStatus.PROCESSING,
+        `${PROVIDER_FAILURE_MESSAGE_PREFIX} ${result.providerStatus ?? ''}`.trim(),
+        result.sessionId ?? transfer.providerReference,
+      );
       return;
     }
 
@@ -252,7 +255,7 @@ export class TransferService {
           },
           {
             status: WalletTransactionStatus.FAILED,
-            message: 'Transfer not found at provider',
+            message: NOT_FOUND_AFTER_SUBMISSION_MESSAGE,
             nextStatusCheckAt: null,
             statusCheckAttempts: transfer.statusCheckAttempts + 1,
           },
@@ -260,7 +263,7 @@ export class TransferService {
 
         if (failed.affected === 1) {
           this.logger.warn(
-            `Failed transfer reference=${transfer.reference}: provider has no record since ${new Date(transfer.firstNotFoundAt).toISOString()}`,
+            `Failed transfer reference=${transfer.reference}: provider has no record since ${new Date(transfer.firstNotFoundAt).toISOString()}; needs manual review`,
           );
         }
         return;
@@ -290,24 +293,12 @@ export class TransferService {
 
     if (result.status === TransferStatusResult.NOT_FOUND) {
       if (this.notFoundLongEnough(transfer)) {
-        const failed = await this.walletTransactionRepo.update(
-          {
-            walletTransactionId: transfer.walletTransactionId,
-            status: WalletTransactionStatus.PENDING,
-          },
-          {
-            status: WalletTransactionStatus.FAILED,
-            message: 'Transfer not found at provider',
-            nextStatusCheckAt: null,
-            statusCheckAttempts: transfer.statusCheckAttempts + 1,
-          },
+        await this.failAndRefund(
+          transfer,
+          WalletTransactionStatus.PENDING,
+          NOT_FOUND_BEFORE_SUBMISSION_MESSAGE,
+          transfer.providerReference,
         );
-
-        if (failed.affected === 1) {
-          this.logger.warn(
-            `Failed stuck pending transfer reference=${transfer.reference}: provider has no record since ${new Date(transfer.firstNotFoundAt).toISOString()}`,
-          );
-        }
         return;
       }
 
@@ -347,6 +338,37 @@ export class TransferService {
       this.logger.warn(
         `Stuck pending transfer reference=${transfer.reference} found at provider; moved to PROCESSING`,
       );
+    }
+  }
+
+  private async failAndRefund(
+    transfer: WalletTransactions,
+    expectedStatus: WalletTransactionStatus,
+    message: string,
+    providerReference: string | null,
+  ) {
+    try {
+      const refund = await this.walletService.failAndReversePayout(
+        transfer.walletTransactionId,
+        expectedStatus,
+        {
+          message,
+          providerReference,
+          statusCheckAttempts: transfer.statusCheckAttempts + 1,
+        },
+      );
+
+      if (refund) {
+        this.logger.warn(
+          `Failed and refunded transfer reference=${transfer.reference} reason="${message}" amount=${refund.amount}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to refund transfer reference=${transfer.reference} reason="${message}"; left ${expectedStatus} for retry`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      await this.scheduleNextStatusCheck(transfer, expectedStatus);
     }
   }
 
